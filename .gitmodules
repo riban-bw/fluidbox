@@ -1,0 +1,3 @@
+[submodule "ribanfblib"]
+	path = ribanfblib
+	url = https://github.com/riban-bw/ribanfblib.git

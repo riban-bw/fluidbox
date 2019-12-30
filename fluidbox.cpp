@@ -5,6 +5,7 @@
 #include <iostream> //provides streams
 #include <fstream> //provides file stream
 #include <map>
+#include <unistd.h> //provides pause
 
 #define DEFAULT_SOUNDFONT "default/TimGM6mb.sf2"
 #define SF_ROOT "sf2/"
@@ -120,7 +121,6 @@ bool loadSoundfont(string sFilename)
     g_nCurrentSoundfont = fluid_synth_sfload(g_pSynth, sPath.c_str(), 1);
     if(g_nCurrentSoundfont >= 0)
         config["general.current_soundfont"] = sFilename;
-    printf("loadSoundfont: %s result: %d\n", sFilename.c_str(), g_nCurrentSoundfont);
     return (g_nCurrentSoundfont >= 0);
 }
 
@@ -195,10 +195,15 @@ int main(int argc, char** argv)
         cout << "Loaded soundfont: " << config["general.current_soundfont"] << endl;
 
     //Wait for keyboard input <enter> before ending
-    getchar(); //!@todo Implement proper program loop
+    //getchar(); //!@todo Implement proper program loop
+    int nSignal = pause();
+    printf("Caught signal %d. Closing fluidbox.\n", nSignal);
+
 
     //Write configuration
     saveConfig();
+
+    g_pScreen->Clear();
 
     // Clean up
     delete_fluid_midi_router(pRouter);

@@ -6,10 +6,18 @@
 #include <fstream> //provides file stream
 #include <map>
 #include <unistd.h> //provides pause
+#include <signal.h> //provides signal handling
 
 #define DEFAULT_SOUNDFONT "default/TimGM6mb.sf2"
 #define SF_ROOT "sf2/"
 #define BUTTON 9
+
+enum {
+    SCREEN_BLANK,
+    SCREEN_LOGO,
+    SCREEN_PROGRAM_1_8,
+    SCREEN_PROGRAM_9_16
+};
 
 using namespace std;
 
@@ -17,15 +25,88 @@ fluid_synth_t* g_pSynth;
 ribanfblib* g_pScreen;
 map<string,string> config;
 int g_nCurrentSoundfont = FLUID_FAILED;
+int g_nScreen = SCREEN_LOGO;
+
+void ShowProgram(int nChannel)
+{
+    int nOffset = 0;
+    if(g_nScreen == SCREEN_PROGRAM_1_8 && nChannel < 8)
+        nOffset = 0;
+    else if(g_nScreen == SCREEN_PROGRAM_9_16 && nChannel > 7)
+        nOffset = 8;
+    else
+        return;
+
+    int nProgram, nBank, nSfId;
+    fluid_synth_get_program(g_pSynth, nChannel, &nSfId, &nBank, &nProgram);
+    fluid_sfont_t* pSoundfont = fluid_synth_get_sfont_by_id(g_pSynth, nSfId);
+    if(pSoundfont)
+    {
+        fluid_preset_t* pPreset = fluid_sfont_get_preset(pSoundfont, nBank, nProgram);
+        if(pPreset)
+        {
+            char sPrefix[6];
+            sprintf(sPrefix, "%02d: ", nChannel);
+            string sPreset = (char*)sPrefix;
+            sPreset += fluid_preset_get_name(pPreset);
+            int nY = (nChannel - nOffset) * 16;
+            g_pScreen->DrawRect(0,nY, 160,nY+15, BLACK, 0, BLACK);
+            g_pScreen->DrawText(sPreset.c_str(), 2, 15+nY, WHITE);
+        }
+    }
+}
+
+void showMidiActivity(int nChannel)
+{
+    int nOffset = 0;
+    if(g_nScreen == SCREEN_PROGRAM_1_8 && nChannel < 8)
+        nOffset = 0;
+    else if(g_nScreen == SCREEN_PROGRAM_9_16 && nChannel > 7)
+        nOffset = 8;
+    else
+        return;
+    int nY = (nChannel - nOffset) * 16;
+    g_pScreen->DrawRect(0,nY, 2,nY+15, RED, 0, RED);
+    alarm(1);
+}
+
+void showScreen(int nScreen)
+{
+    g_nScreen = nScreen;
+    g_pScreen->Clear();
+    if(nScreen == SCREEN_BLANK)
+        return;
+    else if(nScreen == SCREEN_PROGRAM_1_8)
+    {
+        for(int nChannel = 0; nChannel < 8; ++nChannel)
+            ShowProgram(nChannel);
+    }
+    else if(nScreen == SCREEN_PROGRAM_9_16)
+    {
+        for(int nChannel = 8; nChannel < 16; ++nChannel)
+            ShowProgram(nChannel);
+    }
+    else if(nScreen == SCREEN_LOGO)
+    {
+        g_pScreen->LoadBitmap("logo.bmp", "logo");
+        g_pScreen->DrawBitmap("logo", 0, 0);
+    }
+}
 
 int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
 {
+    fluid_synth_handle_midi_event(pData, pEvent);
+    int nChannel = fluid_midi_event_get_channel(pEvent);
     if(fluid_midi_event_get_type(pEvent) == 0xC0)
     {
-        printf("Program change %d on channel %d\n", fluid_midi_event_get_program(pEvent)+1, fluid_midi_event_get_channel(pEvent)+1);
+        int nProgram = fluid_midi_event_get_program(pEvent);
+        string sKey = "midi.program_";
+        sKey += to_string(nChannel);
+        config[sKey] = to_string(nProgram);
+        ShowProgram(nChannel);
     }
+    showMidiActivity(nChannel);
     //printf("event type: 0x%02x\n", fluid_midi_event_get_type(pEvent));
-    fluid_synth_handle_midi_event(pData, pEvent);
     return 0;
 }
 
@@ -124,6 +205,36 @@ bool loadSoundfont(string sFilename)
     return (g_nCurrentSoundfont >= 0);
 }
 
+void *onOpenSoundfont(const char * sFilename)
+{
+    printf("onOpenSoundfont: %s\n", sFilename);
+    return 0;
+}
+
+int onReadSoundfont(void *buf, int count, void *handle)
+{
+    printf("onReadSoundfont\n");
+    return FLUID_OK;
+}
+
+int onSeekSoundfont(void *handle, long offset, int origin)
+{
+    printf("onSeekSoundfont\n");
+    return FLUID_OK;
+}
+
+int onCloseSoundfont(void *handle)
+{
+    printf("onCloseSoundfont\n");
+    return FLUID_OK;
+}
+
+long onTellSoundfont(void *handle)
+{
+    printf("onTellSoundfont\n");
+    return 0;
+}
+
 void onButton()
 {
     printf("Button pressed\n");
@@ -132,14 +243,25 @@ void onButton()
     system("sudo poweroff");
 }
 
+void onSignal(int nSignal)
+{
+    if(nSignal == SIGALRM)
+    {
+    if(g_nScreen == SCREEN_LOGO || g_nScreen == SCREEN_PROGRAM_1_8)
+        showScreen(SCREEN_PROGRAM_1_8);
+    if(g_nScreen == SCREEN_PROGRAM_9_16)
+        showScreen(SCREEN_PROGRAM_9_16);
+    }
+    else if(nSignal == SIGHUP)
+    {
+    }
+}
+
 int main(int argc, char** argv)
 {
     printf("riban fluidbox\n");
     g_pScreen = new ribanfblib("/dev/fb1");
-    g_pScreen->Clear();
-    g_pScreen->DrawText("riban fluidbox", 10, 20);
-    g_pScreen->LoadBitmap("logo.bmp", "logo");
-    g_pScreen->DrawBitmap("logo", 0, 0);
+    showScreen(SCREEN_LOGO);
     loadConfig();
     wiringPiSetup();
     wiringPiISR(BUTTON, INT_EDGE_FALLING, onButton);
@@ -159,6 +281,18 @@ int main(int argc, char** argv)
         cout << "Created synth engine" << endl;
     else
         cerr << "Failed to create synth engine" << endl;
+
+/*
+    // Create soundfont loader hander
+    fluid_sfloader_t *pSfloader = new_fluid_defsfloader(pSettings);
+    fluid_sfloader_set_callbacks(pSfloader,
+                                 onOpenSoundfont,
+                                 onReadSoundfont,
+                                 onSeekSoundfont,
+                                 onTellSoundfont,
+                                 onCloseSoundfont);
+    fluid_synth_add_sfloader(g_pSynth, pSfloader);
+*/
 
     // Create MIDI router
     fluid_midi_router_t* pRouter = new_fluid_midi_router(pSettings, onMidiEvent, g_pSynth);
@@ -194,10 +328,32 @@ int main(int argc, char** argv)
     else
         cout << "Loaded soundfont: " << config["general.current_soundfont"] << endl;
 
-    //Wait for keyboard input <enter> before ending
-    //getchar(); //!@todo Implement proper program loop
-    int nSignal = pause();
-    printf("Caught signal %d. Closing fluidbox.\n", nSignal);
+    // Select saved progams
+    for(int i = 0; i < 16; ++i)
+    {
+        string sKey = "midi.program_";
+        sKey += to_string(i);
+        auto it = config.find(sKey);
+        if(it == config.end())
+            continue;
+        fluid_synth_program_change(g_pSynth, i, stoi(it->second));
+    }
+
+    // Configure signal handlers
+    struct sigaction sa;
+    sa.sa_handler = onSignal;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    if (sigaction(SIGALRM, &sa, NULL) == -1)
+        cerr << "Failed to configure alarm siganal handler" << endl;
+
+    // Show splash screen for a while
+    alarm(2);
+
+    // Wait for keyboard input <enter> before ending
+    getchar(); //!@todo Implement proper program loop
+    //int nSignal = pause();
+    //printf("Caught signal %d. Closing fluidbox.\n", nSignal);
 
 
     //Write configuration

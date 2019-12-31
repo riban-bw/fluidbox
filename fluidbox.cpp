@@ -19,6 +19,12 @@ enum {
     SCREEN_PROGRAM_9_16
 };
 
+enum {
+    PANIC_NOTES,
+    PANIC_SOUNDS,
+    PANIC_RESET
+};
+
 using namespace std;
 
 fluid_synth_t* g_pSynth;
@@ -26,6 +32,35 @@ ribanfblib* g_pScreen;
 map<string,string> config;
 int g_nCurrentSoundfont = FLUID_FAILED;
 int g_nScreen = SCREEN_LOGO;
+int g_nRunState = 1;
+unsigned int g_nNoteCount[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+/** PANIC
+    param nMode Panic mode [PANIC_NOTES | PANIC_SOUNDS | PANIC_RESET]
+    param nChannel MIDI channel to reset [0-15, 16=ALL]
+**/
+void panic(int nMode=PANIC_NOTES, int nChannel=16)
+{
+    if(nMode == PANIC_RESET)
+    {
+        fluid_synth_system_reset(g_pSynth);
+        return;
+    }
+    int nMin = nChannel==16?0:nChannel;
+    int nMax = nChannel;
+    for(int i=nMin; i<nMax; ++i)
+    {
+        switch(nMode)
+        {
+            case PANIC_NOTES:
+                fluid_synth_all_notes_off(g_pSynth, nChannel);
+                break;
+            case PANIC_SOUNDS:
+                fluid_synth_all_sounds_off(g_pSynth, nChannel);
+                break;
+        }
+    }
+}
 
 void ShowProgram(int nChannel)
 {
@@ -56,6 +91,9 @@ void ShowProgram(int nChannel)
     }
 }
 
+/**     Update the MIDI note on indicator on the program screens showing quantity of on notes (max 15)
+*       @param nChannel MIDI channel to update
+*/
 void showMidiActivity(int nChannel)
 {
     int nOffset = 0;
@@ -66,8 +104,9 @@ void showMidiActivity(int nChannel)
     else
         return;
     int nY = (nChannel - nOffset) * 16;
+    g_pScreen->DrawRect(0,nY, 2,nY+15, BLACK, 0, BLACK);
+    nY -= (g_nNoteCount[nChannel] < 16)?g_nNoteCount[nChannel]:15;
     g_pScreen->DrawRect(0,nY, 2,nY+15, RED, 0, RED);
-    alarm(1);
 }
 
 void showScreen(int nScreen)
@@ -97,16 +136,30 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
 {
     fluid_synth_handle_midi_event(pData, pEvent);
     int nChannel = fluid_midi_event_get_channel(pEvent);
-    if(fluid_midi_event_get_type(pEvent) == 0xC0)
+    int nType = fluid_midi_event_get_type(pEvent) == 0xC0;
+    switch(nType)
     {
-        int nProgram = fluid_midi_event_get_program(pEvent);
-        string sKey = "midi.program_";
-        sKey += to_string(nChannel);
-        config[sKey] = to_string(nProgram);
-        ShowProgram(nChannel);
+        case 0xC0: // Program change
+        {
+            int nProgram = fluid_midi_event_get_program(pEvent);
+            string sKey = "midi.program_";
+            sKey += to_string(nChannel);
+            config[sKey] = to_string(nProgram);
+            ShowProgram(nChannel);
+            break;
+        }
+        case 0x80: // Note off
+            if(g_nNoteCount > 0)
+                g_nNoteCount[nChannel]--;
+            showMidiActivity(nChannel);
+            break;
+        case 0x90: // Note on
+            g_nNoteCount[nChannel]++;
+            showMidiActivity(nChannel);
+            break;
+        default:
+            printf("event type: 0x%02x\n", fluid_midi_event_get_type(pEvent));
     }
-    showMidiActivity(nChannel);
-    //printf("event type: 0x%02x\n", fluid_midi_event_get_type(pEvent));
     return 0;
 }
 
@@ -205,55 +258,30 @@ bool loadSoundfont(string sFilename)
     return (g_nCurrentSoundfont >= 0);
 }
 
-void *onOpenSoundfont(const char * sFilename)
-{
-    printf("onOpenSoundfont: %s\n", sFilename);
-    return 0;
-}
-
-int onReadSoundfont(void *buf, int count, void *handle)
-{
-    printf("onReadSoundfont\n");
-    return FLUID_OK;
-}
-
-int onSeekSoundfont(void *handle, long offset, int origin)
-{
-    printf("onSeekSoundfont\n");
-    return FLUID_OK;
-}
-
-int onCloseSoundfont(void *handle)
-{
-    printf("onCloseSoundfont\n");
-    return FLUID_OK;
-}
-
-long onTellSoundfont(void *handle)
-{
-    printf("onTellSoundfont\n");
-    return 0;
-}
-
 void onButton()
 {
     printf("Button pressed\n");
     g_pScreen->Clear(BLUE);
     g_pScreen->DrawText("Shutting down...", 10, 30);
+    saveConfig();
     system("sudo poweroff");
 }
 
 void onSignal(int nSignal)
 {
-    if(nSignal == SIGALRM)
+    switch(nSignal)
     {
-    if(g_nScreen == SCREEN_LOGO || g_nScreen == SCREEN_PROGRAM_1_8)
-        showScreen(SCREEN_PROGRAM_1_8);
-    if(g_nScreen == SCREEN_PROGRAM_9_16)
-        showScreen(SCREEN_PROGRAM_9_16);
-    }
-    else if(nSignal == SIGHUP)
-    {
+    	case SIGALRM:
+    		if(g_nScreen == SCREEN_LOGO || g_nScreen == SCREEN_PROGRAM_1_8)
+        		showScreen(SCREEN_PROGRAM_1_8);
+    		if(g_nScreen == SCREEN_PROGRAM_9_16)
+        		showScreen(SCREEN_PROGRAM_9_16);
+		break;
+    	case SIGINT:
+    	case SIGTERM:
+		printf("Recieved signal to quit...\n");
+        	g_nRunState = 0;
+		break;
     }
 }
 
@@ -281,18 +309,6 @@ int main(int argc, char** argv)
         cout << "Created synth engine" << endl;
     else
         cerr << "Failed to create synth engine" << endl;
-
-/*
-    // Create soundfont loader hander
-    fluid_sfloader_t *pSfloader = new_fluid_defsfloader(pSettings);
-    fluid_sfloader_set_callbacks(pSfloader,
-                                 onOpenSoundfont,
-                                 onReadSoundfont,
-                                 onSeekSoundfont,
-                                 onTellSoundfont,
-                                 onCloseSoundfont);
-    fluid_synth_add_sfloader(g_pSynth, pSfloader);
-*/
 
     // Create MIDI router
     fluid_midi_router_t* pRouter = new_fluid_midi_router(pSettings, onMidiEvent, g_pSynth);
@@ -340,21 +356,17 @@ int main(int argc, char** argv)
     }
 
     // Configure signal handlers
-    struct sigaction sa;
-    sa.sa_handler = onSignal;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    if (sigaction(SIGALRM, &sa, NULL) == -1)
-        cerr << "Failed to configure alarm siganal handler" << endl;
+    signal(SIGALRM, onSignal);
+    signal(SIGINT, onSignal);
+    signal(SIGTERM, onSignal);
 
     // Show splash screen for a while
     alarm(2);
 
-    // Wait for keyboard input <enter> before ending
-    getchar(); //!@todo Implement proper program loop
-    //int nSignal = pause();
-    //printf("Caught signal %d. Closing fluidbox.\n", nSignal);
+    while(g_nRunState)
+        pause();
 
+    // If we are here then it is all over so let's tidy up...
 
     //Write configuration
     saveConfig();
@@ -369,11 +381,5 @@ int main(int argc, char** argv)
     delete_fluid_settings(pSettings);
     delete g_pScreen;
     return 0;
-
-    /*
-        Create synth with settings: MidiAutoconnect=1, cores=3, SynthChorusActive=0, SynthReverbActive=0, driver="alsa", midi_driver="alsa_seq")
-        Load configuration
-        Load soundfont
-    */
 }
 

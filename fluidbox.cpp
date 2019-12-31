@@ -10,11 +10,15 @@
 
 #define DEFAULT_SOUNDFONT "default/TimGM6mb.sf2"
 #define SF_ROOT "sf2/"
+#define MAX_PRESETS 127
 #define BUTTON 9
+
+using namespace std;
 
 enum {
     SCREEN_BLANK,
     SCREEN_LOGO,
+    SCREEN_PERFORMANCE,
     SCREEN_PROGRAM_1_8,
     SCREEN_PROGRAM_9_16
 };
@@ -25,15 +29,96 @@ enum {
     PANIC_RESET
 };
 
-using namespace std;
+struct Program {
+    string name = "New program";
+    unsigned int bank = 0;
+    unsigned int program = 0;
+    unsigned int level = 100;
+    unsigned int balance = 63;
+};
+
+struct Reverb {
+    bool enable = false;
+    double roomsize = 0;
+    double damping = 0;
+    double width = 0;
+    double level = 0;
+};
+
+struct Chorus {
+    bool enable = false;
+    int voicecount = 0;
+    double level = 0;
+    double speed = 0;
+    double depth = 0;
+    int type = 0;
+};
+
+struct Preset {
+    string name;
+    string soundfont;
+    Program program[16];
+    Reverb reverb;
+    Chorus chorus;
+};
 
 fluid_synth_t* g_pSynth;
 ribanfblib* g_pScreen;
-map<string,string> config;
+unsigned int g_nCurrentPreset = 0;
+bool g_bPresetDirty = false;
 int g_nCurrentSoundfont = FLUID_FAILED;
 int g_nScreen = SCREEN_LOGO;
 int g_nRunState = 1;
 unsigned int g_nNoteCount[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+Preset g_presets[MAX_PRESETS];
+
+/**     Return a converted and vaildated value
+*       @param sValue Value as a string
+*       @param min Minimum permitted value
+*       @param max Maximum permitted value
+*       @retval double Value converted to double limited to range min-max
+*/
+double validateDouble(string sValue, double min, double max)
+{
+    double fValue = 0.0;
+    try
+    {
+        fValue = stod(sValue);
+    }
+    catch(...)
+    {
+        cerr << "Error converting string '" << sValue << "' to double" << endl;
+    }
+    if(fValue < min)
+        return min;
+    if(fValue > max)
+        return max;
+    return fValue;
+}
+
+/**     Return a converted and vaildated value
+*       @param sValue Value as a string
+*       @param min Minimum permitted value
+*       @param max Maximum permitted value
+*       @retval int Value converted to int limited to range min-max
+*/
+int validateInt(string sValue, int min, int max)
+{
+    int nValue = 0;
+    try
+    {
+        nValue = stoi(sValue);
+    }
+    catch(...)
+    {
+        cerr << "Error converting string '" << sValue << "' to integer" << endl;
+    }
+    if(nValue < min)
+        return min;
+    if(nValue > max)
+        return max;
+    return nValue;
+}
 
 /** PANIC
     param nMode Panic mode [PANIC_NOTES | PANIC_SOUNDS | PANIC_RESET]
@@ -62,6 +147,18 @@ void panic(int nMode=PANIC_NOTES, int nChannel=16)
     }
 }
 
+void ShowPreset(int nPreset)
+{
+    if(nPreset > MAX_PRESETS)
+        return;
+    string sName = to_string(nPreset);
+    sName += ": ";
+    sName += g_presets[nPreset].name;
+    g_pScreen->Clear();
+    g_pScreen->DrawText(sName, 0, 20);
+}
+
+/**     Updates the display of a program for the specified channel */
 void ShowProgram(int nChannel)
 {
     int nOffset = 0;
@@ -103,12 +200,14 @@ void showMidiActivity(int nChannel)
         nOffset = 8;
     else
         return;
-    int nY = (nChannel - nOffset) * 16;
-    g_pScreen->DrawRect(0,nY, 2,nY+15, BLACK, 0, BLACK);
-    nY -= (g_nNoteCount[nChannel] < 16)?g_nNoteCount[nChannel]:15;
-    g_pScreen->DrawRect(0,nY, 2,nY+15, RED, 0, RED);
+    int nY = (nChannel - nOffset) * 16; //Upper left corner of channel indicator
+    g_pScreen->DrawRect(0,nY, 2,nY+15, BLACK, 0, BLACK); // Clear the indicator
+    int nCount = (g_nNoteCount[nChannel] < 16)?g_nNoteCount[nChannel]:15; // Limit max note indication to 15
+    if(nCount)
+        g_pScreen->DrawRect(0,nY+15, 2,nY+15-nCount, RED, 0, RED); // Draw indicator
 }
 
+/**     Display the requested screen */
 void showScreen(int nScreen)
 {
     g_nScreen = nScreen;
@@ -132,11 +231,12 @@ void showScreen(int nScreen)
     }
 }
 
+/**     Handle MIDI events */
 int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
 {
     fluid_synth_handle_midi_event(pData, pEvent);
     int nChannel = fluid_midi_event_get_channel(pEvent);
-    int nType = fluid_midi_event_get_type(pEvent) == 0xC0;
+    int nType = fluid_midi_event_get_type(pEvent);
     switch(nType)
     {
         case 0xC0: // Program change
@@ -144,12 +244,12 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
             int nProgram = fluid_midi_event_get_program(pEvent);
             string sKey = "midi.program_";
             sKey += to_string(nChannel);
-            config[sKey] = to_string(nProgram);
+            g_presets[0].program[nChannel].program = nProgram;
             ShowProgram(nChannel);
             break;
         }
         case 0x80: // Note off
-            if(g_nNoteCount > 0)
+            if(g_nNoteCount[nChannel] > 0)
                 g_nNoteCount[nChannel]--;
             showMidiActivity(nChannel);
             break;
@@ -158,11 +258,12 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
             showMidiActivity(nChannel);
             break;
         default:
-            printf("event type: 0x%02x\n", fluid_midi_event_get_type(pEvent));
+            printf("event type: 0x%02x\n", nType);
     }
     return 0;
 }
 
+/**     Convert string to lowercase */
 string toLower(string sString)
 {
     string sReturn;
@@ -171,6 +272,7 @@ string toLower(string sString)
     return sReturn;
 }
 
+/**     Load configuration from file */
 bool loadConfig(string sFilename = "./fb.config")
 {
     ifstream fileConfig;
@@ -203,15 +305,74 @@ bool loadConfig(string sFilename = "./fb.config")
         size_t nDelim = sLine.find_first_of("=");
         if(nDelim == string::npos)
             continue; //Not a valid value definition
-        string sParam = sGroup + "." + sLine.substr(0, nDelim);
+        string sParam = sLine.substr(0, nDelim);
         string sValue = sLine.substr(nDelim + 1);
-        config[toLower(sParam)] = sValue;
-        printf("Found config: %s, %s\n", sParam.c_str(), sValue.c_str());
+
+        if(sGroup.substr(0,7) == "preset_")
+        {
+            //!@todo Optimise - don't need to calculate preset id on every iteration
+            unsigned int nIndex = validateInt(sGroup.substr(7), 0, MAX_PRESETS);
+            if(nIndex > MAX_PRESETS)
+                continue;
+            if(sParam == "name")
+                g_presets[nIndex].name = sValue;
+            else if(sParam == "soundfont")
+                g_presets[nIndex].soundfont = sValue;
+            else if(sParam.substr(0,5) == "prog_")
+            {
+                int nChan = validateInt(sParam.substr(5), 0, 15);
+                nDelim = sValue.find_first_of(':');
+                if(nDelim == string::npos)
+                    continue; // Not a valid bank:program value pair
+                g_presets[nIndex].program[nChan].bank = validateInt(sValue.substr(0,nDelim), 0, 16383);
+                g_presets[nIndex].program[nChan].program = validateInt(sValue.substr(nDelim + 1), 0, 127);
+            }
+            else if(sParam.substr(0,6) == "level_")
+            {
+                int nChan = validateInt(sParam.substr(6), 0, 15);
+                g_presets[nIndex].program[nChan].level = validateInt(sValue, 0, 127);
+            }
+            else if(sParam.substr(0,8) == "balance_")
+            {
+                int nChan = validateInt(sParam.substr(8), 0, 15);
+                g_presets[nIndex].program[nChan].balance = validateInt(sValue, 0, 127);
+            }
+            else if (sParam.substr(0,7) == "reverb_")
+            {
+                if(sParam.substr(7) == "enable") 
+                    g_presets[nIndex].reverb.enable = (sValue == "1");
+                if(sParam.substr(7) == "roomsize")
+                    g_presets[nIndex].reverb.roomsize = validateDouble(sValue, 0.0, 1.0);
+                if(sParam.substr(7) == "damping")
+                    g_presets[nIndex].reverb.damping = validateDouble(sValue, 0.0, 1.0);
+                if(sParam.substr(7) == "width")
+                    g_presets[nIndex].reverb.width = validateDouble(sValue, 0.0, 100.0);
+                if(sParam.substr(7) == "level")
+                    g_presets[nIndex].reverb.level = validateDouble(sValue, 0.0, 1.0);
+            }
+            else if (sParam.substr(0,7) == "chorus_")
+            {
+                if(sParam.substr(7) == "enable")
+                    g_presets[nIndex].chorus.enable = (sValue == "1");
+                if(sParam.substr(7) == "voicecount")
+                    g_presets[nIndex].chorus.voicecount = validateInt(sValue, 0, 99);
+                if(sParam.substr(7) == "level")
+                    g_presets[nIndex].chorus.level = validateDouble(sValue, 0.0, 10.0);
+                if(sParam.substr(7) == "speed")
+                    g_presets[nIndex].chorus.speed = validateDouble(sValue, 0.1, 5.0);
+                if(sParam.substr(7) == "depth")
+                    g_presets[nIndex].chorus.depth = validateDouble(sValue, 0.0, 21.0);
+                if(sParam.substr(7) == "type")
+                    g_presets[nIndex].chorus.type = validateInt(sValue, 0, 1);
+            }
+        }
+
     }
     fileConfig.close();
     return true;
 }
 
+/**     Save persistent data to configuration file */
 bool saveConfig(string sFilename = "./fb.config")
 {
     ofstream fileConfig;
@@ -221,28 +382,34 @@ bool saveConfig(string sFilename = "./fb.config")
         printf("Error: Failed to open configuration: %s\n", sFilename.c_str());
         return false;
     }
-    string sLine, sGroup;
-    for(auto it=config.begin(); it!=config.end(); ++it)
+    for(unsigned int nPreset = 0; nPreset < MAX_PRESETS; ++nPreset)
     {
-        string sParam = it->first;
-        size_t nDelim = sParam.find_first_of('.');
-        string sNewGroup;
-        if(nDelim != string::npos)
+        fileConfig << endl << "[preset_" << nPreset << "]" << endl;
+        fileConfig << endl << "name=" << g_presets[nPreset].name << endl;
+        fileConfig << endl << "soundfont=" << g_presets[nPreset].soundfont << endl;
+        for(unsigned int nProgram = 0; nProgram < 16; ++nProgram)
         {
-            sNewGroup = sParam.substr(0, nDelim);
-            sParam = sParam.substr(nDelim + 1);
+            fileConfig << "prog_" << nProgram << "=" << g_presets[nPreset].program[nProgram].bank << ":" << g_presets[nPreset].program[nProgram].program << endl;
+            fileConfig << "level_" << nProgram << "=" << g_presets[nPreset].program[nProgram].level << endl;
+            fileConfig << "balance_" << nProgram << "=" << g_presets[nPreset].program[nProgram].balance << endl;
         }
-        if(sGroup != sNewGroup)
-        {
-            sGroup = sNewGroup;
-            fileConfig << endl << "[" << sGroup << "]" << endl;
-        }
-        fileConfig << sParam << "=" << it->second << endl;
+        fileConfig << "reverb_enable=" <<  (g_presets[nPreset].reverb.enable?"1":"0") << endl;
+        fileConfig << "reverb_roomsize=" <<  g_presets[nPreset].reverb.roomsize << endl;
+        fileConfig << "reverb_damping=" <<  g_presets[nPreset].reverb.damping << endl;
+        fileConfig << "reverb_width=" <<  g_presets[nPreset].reverb.width << endl;
+        fileConfig << "reverb_level=" <<  g_presets[nPreset].reverb.level << endl;
+        fileConfig << "chorus_enable=" <<  g_presets[nPreset].chorus.enable << endl;
+        fileConfig << "chorus_voicecount=" <<  g_presets[nPreset].chorus.voicecount << endl;
+        fileConfig << "chorus_level=" <<  g_presets[nPreset].chorus.level << endl;
+        fileConfig << "chorus_speed=" <<  g_presets[nPreset].chorus.speed << endl;
+        fileConfig << "chorus_depth=" <<  g_presets[nPreset].chorus.depth << endl;
+        fileConfig << "chorus_type=" <<  g_presets[nPreset].chorus.type << endl;
     }
     fileConfig.close();
     return true;
 }
 
+/**     Loads a soundfont from file, unloading previously loaded soundfont */
 bool loadSoundfont(string sFilename)
 {
     if(g_nCurrentSoundfont >= 0)
@@ -254,10 +421,56 @@ bool loadSoundfont(string sFilename)
     sPath += sFilename;
     g_nCurrentSoundfont = fluid_synth_sfload(g_pSynth, sPath.c_str(), 1);
     if(g_nCurrentSoundfont >= 0)
-        config["general.current_soundfont"] = sFilename;
+    {
+        g_presets[0].soundfont = sFilename;
+        g_bPresetDirty = true;
+    }
     return (g_nCurrentSoundfont >= 0);
 }
 
+/**     Select a preset
+*       @param nPreset Index of preset to load
+*       @retval bool True on success
+*/
+bool selectPreset(unsigned int nPreset)
+{
+    if(nPreset > MAX_PRESETS)
+        return false;
+    Preset* pPreset = &(g_presets[nPreset]);
+    Preset* pPreset0 = &(g_presets[0]);
+    // We use preset 0 for the currently selected and edited preset
+    if((nPreset == 0) || (pPreset->soundfont != pPreset0->soundfont))
+        if(!loadSoundfont(pPreset->soundfont))
+            return false;
+
+    for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
+    {
+        fluid_synth_program_select(g_pSynth, nChannel, g_nCurrentSoundfont, pPreset->program[nChannel].bank, pPreset->program[nChannel].program);
+        pPreset0->program[nChannel].program = pPreset->program[nChannel].program;
+        pPreset0->program[nChannel].bank = pPreset->program[nChannel].bank;
+        pPreset0->program[nChannel].level = pPreset->program[nChannel].level;
+        pPreset0->program[nChannel].balance = pPreset->program[nChannel].balance;
+        //!@todo set level and balance
+    }
+
+    //!@todo Extract this to a presetCopy function
+    pPreset0->name = pPreset->name;
+    pPreset0->soundfont = pPreset->soundfont;
+    pPreset0->reverb.enable = pPreset->reverb.enable;
+    pPreset0->reverb.roomsize = pPreset->reverb.roomsize;
+    pPreset0->reverb.damping = pPreset->reverb.damping;
+    pPreset0->reverb.width = pPreset->reverb.width;
+    pPreset0->reverb.level = pPreset->reverb.level;
+    pPreset0->chorus.enable = pPreset->chorus.enable;
+    pPreset0->chorus.voicecount = pPreset->chorus.voicecount;
+    pPreset0->chorus.level = pPreset->chorus.level;
+    pPreset0->chorus.speed = pPreset->chorus.speed;
+    pPreset0->chorus.depth = pPreset->chorus.depth;
+    pPreset0->chorus.type = pPreset->chorus.type;
+    return true;
+}
+
+/**     Handle button press - powers off device */
 void onButton()
 {
     printf("Button pressed\n");
@@ -267,6 +480,7 @@ void onButton()
     system("sudo poweroff");
 }
 
+/*     Handles signal */
 void onSignal(int nSignal)
 {
     switch(nSignal)
@@ -285,6 +499,8 @@ void onSignal(int nSignal)
     }
 }
 
+
+/**     Main application */
 int main(int argc, char** argv)
 {
     printf("riban fluidbox\n");
@@ -331,29 +547,8 @@ int main(int argc, char** argv)
     else
         cerr << "Failed to create audio driver" << endl;
 
-    // Load soundfont
-    
-    //g_nCurrentSoundfont = loadSoundfont("");
-    if(!loadSoundfont(config["general.current_soundfont"]))
-    {
-        printf("Cannot load soundfont: %s. Trying default: %s\n", config["general.current_soundfont"].c_str(), DEFAULT_SOUNDFONT);
-        loadSoundfont(DEFAULT_SOUNDFONT);
-    }
-    if(g_nCurrentSoundfont == FLUID_FAILED)
-        cerr << "Failed to load soundfont" << endl;
-    else
-        cout << "Loaded soundfont: " << config["general.current_soundfont"] << endl;
-
-    // Select saved progams
-    for(int i = 0; i < 16; ++i)
-    {
-        string sKey = "midi.program_";
-        sKey += to_string(i);
-        auto it = config.find(sKey);
-        if(it == config.end())
-            continue;
-        fluid_synth_program_change(g_pSynth, i, stoi(it->second));
-    }
+    // Select preset zero
+    selectPreset(0);
 
     // Configure signal handlers
     signal(SIGALRM, onSignal);

@@ -36,13 +36,22 @@ enum {
     SCREEN_LOGO,
     SCREEN_PERFORMANCE,
     SCREEN_PROGRAM,
-    SCREEN_SELECT_PROGRAM
+    SCREEN_SELECT_PROGRAM,
+    SCREEN_EDIT
 };
 
 enum {
     PANIC_NOTES,
     PANIC_SOUNDS,
     PANIC_RESET
+};
+
+enum {
+    EDIT_PRESET,
+    EDIT_ADDSF,
+    EDIT_UPDATE,
+    EDIT_REBOOT,
+    EDIT_EOL
 };
 
 struct Program {
@@ -71,8 +80,8 @@ struct Chorus {
 };
 
 struct Preset {
-    string name;
-    string soundfont;
+    string name = "New preset";
+    string soundfont = DEFAULT_SOUNDFONT;
     Program program[16];
     Reverb reverb;
     Chorus chorus;
@@ -89,6 +98,8 @@ Preset g_presets[MAX_PRESETS]; // Preset configurations
 unsigned int g_nCurrentPreset = 1; // Index of the selected preset
 unsigned int g_nSelectedChannel = 0; // Index of the selected (highlighted) program
 unsigned int g_nProgScreenFirst = 0; // Channel at top of program screen
+unsigned int g_nListSelection = 0; // Currently highlighted entry in a list
+unsigned char debouncePin[32]; // Debounce streams for each GPIO pin
 
 /**     Return a converted and vaildated value
 *       @param sValue Value as a string
@@ -256,6 +267,20 @@ void showProgramScreen()
     }
 }
 
+/**  Display edit options (utility menu) */
+void showEditScreen()
+{
+    g_pScreen->Clear();
+    g_pScreen->DrawRect(0,0, 160,16, BLUE, 0, BLUE);
+    string sTitle = "Edit";
+    g_pScreen->DrawText(sTitle, 0, 0);
+    g_pScreen->DrawRect(0, g_nListSelection * 16 + 32, BLUE, 0, BLUE);
+    g_pScreen->DrawText("Edit preset", 0, 48);
+    g_pScreen->DrawText("Add soundfont", 0, 64);
+    g_pScreen->DrawText("Update", 0, 80);
+    g_pScreen->DrawText("Reboot", 0, 96);
+}
+
 /** Display the requested screen
     @param nScreen ID of screen to display
 */
@@ -270,6 +295,9 @@ void showScreen(int nScreen)
             break;
         case SCREEN_PROGRAM:
             showProgramScreen();
+            break;
+        case SCREEN_EDIT:
+            showEditScreen();
             break;
         case SCREEN_BLANK:
             return;
@@ -531,8 +559,9 @@ bool selectPreset(unsigned int nPreset)
     if(nPreset > MAX_PRESETS)
         return false;
     // We use preset 0 for the currently selected and edited preset
+    cout << "Select preset " << nPreset << endl;
     Preset* pPreset = &(g_presets[0]);
-    if((nPreset == 0) || (pPreset->soundfont != g_presets[nPreset].soundfont))
+    //if(pPreset->soundfont != g_presets[nPreset].soundfont))
         if(!loadSoundfont(g_presets[nPreset].soundfont))
             return false;
     copyPreset(nPreset, 0);
@@ -552,7 +581,6 @@ bool selectPreset(unsigned int nPreset)
 */
 void onNavigation(unsigned int nButton)
 {
-    cout << "onNavigation(" << nButton << ")" << endl;
     switch(g_nScreen)
     {
         case SCREEN_LOGO:
@@ -560,6 +588,60 @@ void onNavigation(unsigned int nButton)
             showScreen(SCREEN_PERFORMANCE);
             break;
         case SCREEN_PERFORMANCE:
+            switch(nButton)
+            {
+                case BUTTON_UP:
+                    if(g_nCurrentPreset < 2)
+                        return;
+                    selectPreset(--g_nCurrentPreset);
+                    showScreen(SCREEN_PERFORMANCE);
+                    break;
+                case BUTTON_DOWN:
+                    if(g_nCurrentPreset > MAX_PRESETS - 2)
+                        return;
+                    selectPreset(++g_nCurrentPreset);
+                    showScreen(SCREEN_PERFORMANCE);
+                    break;
+                case BUTTON_RIGHT:
+                    showScreen(SCREEN_EDIT);
+                    break;
+                case BUTTON_LEFT:
+                    break;
+            }
+            break;
+        case SCREEN_EDIT:
+            switch(nButton)
+            {
+                case BUTTON_UP:
+                    if(g_nListSelection == 0)
+                        return;
+                    --g_nListSelection;
+                    showScreen(SCREEN_EDIT);
+                    break;
+                case BUTTON_DOWN:
+                    if(g_nListSelection >= EDIT_EOL)
+                        return;
+                    ++g_nListSelection;
+                    showScreen(SCREEN_EDIT);
+                    break;
+                case BUTTON_RIGHT:
+                    switch(g_nListSelection)
+                    {
+                        case EDIT_PRESET:
+                            showScreen(SCREEN_PROGRAM); //!@todo Add preset edit screen
+                            break;
+                        case EDIT_ADDSF:
+                            break;
+                        case EDIT_UPDATE:
+                            break;
+                        case EDIT_REBOOT:
+                            break;
+                    }
+                    break;
+                case BUTTON_LEFT:
+                    showScreen(SCREEN_PERFORMANCE);
+                    break;
+            }
             break;
         case SCREEN_PROGRAM:
             switch(nButton)
@@ -583,42 +665,51 @@ void onNavigation(unsigned int nButton)
                     showScreen(SCREEN_SELECT_PROGRAM);
                     break;
             }
+        default:
+            switch(nButton)
+            {
+                case BUTTON_UP:
+                    break;
+                case BUTTON_DOWN:
+                    break;
+                case BUTTON_RIGHT:
+                    break;
+                case BUTTON_LEFT:
+                    break;
+            }
+            break;
     }
 }
 
-/** Handle button press - powers off device */
-void onButtonPower()
+void onButton(unsigned int nPin)
 {
-    printf("Button pressed\n");
-    g_pScreen->Clear(BLUE);
-    g_pScreen->DrawText("Shutting down...", 10, 30);
-    saveConfig();
-    system("sudo poweroff");
+    cout << "Button: " << nPin << endl;
+    switch(nPin)
+    {
+        case BUTTON_UP:
+        case BUTTON_DOWN:
+        case BUTTON_RIGHT:
+        case BUTTON_LEFT:
+            onNavigation(nPin);
+            break;
+        case BUTTON_POWER:
+            g_pScreen->Clear(BLUE);
+            g_pScreen->DrawText("Shutting down...", 10, 30);
+            saveConfig();
+            //system("sudo poweroff");
+            break;
+        case BUTTON_PANIC:
+            panic();
+            break;
+    }
 }
 
-void onButtonUp()
+void debounce(int nPin)
 {
-    onNavigation(BUTTON_UP);
-}
-
-void onButtonDown()
-{
-    onNavigation(BUTTON_DOWN);
-}
-
-void onButtonLeft()
-{
-    onNavigation(BUTTON_LEFT);
-}
-
-void onButtonRight()
-{
-    onNavigation(BUTTON_RIGHT);
-}
-
-void onButtonPanic()
-{
-    panic();
+    debouncePin[nPin] <<=1;
+    debouncePin[nPin] |= digitalRead(nPin);
+    if(debouncePin[nPin] == 0x7F)
+        onButton(nPin);
 }
 
 /**  Handles signal */
@@ -691,12 +782,18 @@ int main(int argc, char** argv)
 
     // Configure buttons
     wiringPiSetupGpio();
-    wiringPiISR(BUTTON_POWER, INT_EDGE_FALLING, onButtonPower);
-    wiringPiISR(BUTTON_PANIC, INT_EDGE_FALLING, onButtonPanic);
-    wiringPiISR(BUTTON_UP, INT_EDGE_FALLING, onButtonUp);
-    wiringPiISR(BUTTON_DOWN, INT_EDGE_FALLING, onButtonDown);
-    wiringPiISR(BUTTON_LEFT, INT_EDGE_FALLING, onButtonLeft);
-    wiringPiISR(BUTTON_RIGHT, INT_EDGE_FALLING, onButtonRight);
+    pinMode(BUTTON_POWER, INPUT);
+    pinMode(BUTTON_PANIC, INPUT);
+    pinMode(BUTTON_UP, INPUT);
+    pinMode(BUTTON_DOWN, INPUT);
+    pinMode(BUTTON_LEFT, INPUT);
+    pinMode(BUTTON_RIGHT, INPUT);
+    pullUpDnControl(BUTTON_POWER, PUD_UP);
+    pullUpDnControl(BUTTON_PANIC, PUD_UP);
+    pullUpDnControl(BUTTON_UP, PUD_UP);
+    pullUpDnControl(BUTTON_DOWN, PUD_UP);
+    pullUpDnControl(BUTTON_LEFT, PUD_UP);
+    pullUpDnControl(BUTTON_RIGHT, PUD_UP);
 
     // Configure signal handlers
     signal(SIGALRM, onSignal);
@@ -707,7 +804,16 @@ int main(int argc, char** argv)
     alarm(2);
 
     while(g_nRunState)
-        pause();
+    {
+        debounce(BUTTON_POWER);
+        debounce(BUTTON_PANIC);
+        debounce(BUTTON_UP);
+        debounce(BUTTON_DOWN);
+        debounce(BUTTON_LEFT);
+        debounce(BUTTON_RIGHT);
+        delay(5);
+    }
+        //pause();
 
     // If we are here then it is all over so let's tidy up...
 

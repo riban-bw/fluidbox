@@ -12,12 +12,22 @@
 #define SF_ROOT "sf2/"
 #define MAX_PRESETS 127
 #define CHANNELS_IN_PROG_SCREEN 6
-#define BUTTON_UP 4
-#define BUTTON_DOWN 17
-#define BUTTON_LEFT 27
-#define BUTTON_RIGHT 22
-#define BUTTON_PANIC 25
-#define BUTTON_POWER 9
+
+// Define GPIO pin usage (note some are not used by code but useful for planning
+#define BUTTON_POWER   3
+#define BUTTON_UP      4
+#define BUTTON_DOWN   17
+#define BUTTON_LEFT   27
+#define BUTTON_RIGHT  22
+#define BUTTON_PANIC  23
+#define SPI_CE1        7
+#define DISPLAY_CS     8
+#define SPI_CE0        8
+#define SPI_MISO       9
+#define SPI_MOSI      10
+#define SPI_SCLK      11
+#define DISPLAY_DC    24
+#define DISPLAY_RESET 25
 
 using namespace std;
 
@@ -76,7 +86,7 @@ int g_nScreen = SCREEN_LOGO; // ID of currently displayed screen - maybe should 
 int g_nRunState = 1; // Current run state [1=running, 0=closing]
 unsigned int g_nNoteCount[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // Quantity of notes playing on each MIDI channel
 Preset g_presets[MAX_PRESETS]; // Preset configurations
-unsigned int g_nCurrentPreset = 0; // Index of the last selected preset
+unsigned int g_nCurrentPreset = 1; // Index of the selected preset
 unsigned int g_nSelectedChannel = 0; // Index of the selected (highlighted) program
 unsigned int g_nProgScreenFirst = 0; // Channel at top of program screen
 
@@ -269,7 +279,7 @@ void showScreen(int nScreen)
     }
 }
 
-/**     Handle MIDI events */
+/** Handle MIDI events */
 int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
 {
     fluid_synth_handle_midi_event(pData, pEvent);
@@ -302,7 +312,7 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
     return 0;
 }
 
-/**     Convert string to lowercase */
+/** Convert string to lowercase */
 string toLower(string sString)
 {
     string sReturn;
@@ -311,7 +321,7 @@ string toLower(string sString)
     return sReturn;
 }
 
-/**     Load configuration from file */
+/** Load configuration from file */
 bool loadConfig(string sFilename = "./fb.config")
 {
     ifstream fileConfig;
@@ -405,13 +415,17 @@ bool loadConfig(string sFilename = "./fb.config")
                     g_presets[nIndex].chorus.type = validateInt(sValue, 0, 1);
             }
         }
-
+        else if(sGroup == "global")
+        {
+            if(sParam == "preset")
+                g_nCurrentPreset = validateInt(sValue, 1, MAX_PRESETS);
+        }
     }
     fileConfig.close();
     return true;
 }
 
-/**     Save persistent data to configuration file */
+/** Save persistent data to configuration file */
 bool saveConfig(string sFilename = "./fb.config")
 {
     ofstream fileConfig;
@@ -421,6 +435,12 @@ bool saveConfig(string sFilename = "./fb.config")
         printf("Error: Failed to open configuration: %s\n", sFilename.c_str());
         return false;
     }
+
+    // Save global settings
+    fileConfig << "[global]" << endl;
+    fileConfig << "preset=" << to_string(g_nCurrentPreset) << endl;
+
+    // Save presets
     for(unsigned int nPreset = 0; nPreset < MAX_PRESETS; ++nPreset)
     {
         fileConfig << endl << "[preset_" << nPreset << "]" << endl;
@@ -448,7 +468,7 @@ bool saveConfig(string sFilename = "./fb.config")
     return true;
 }
 
-/**     Loads a soundfont from file, unloading previously loaded soundfont */
+/** Loads a soundfont from file, unloading previously loaded soundfont */
 bool loadSoundfont(string sFilename)
 {
     if(g_nCurrentSoundfont >= 0)
@@ -502,9 +522,9 @@ bool copyPreset(unsigned int nSource, unsigned int nDestination)
     return true;
 }
 
-/**     Select a preset
-*       @param nPreset Index of preset to load
-*       @retval bool True on success
+/** Select a preset
+*   @param nPreset Index of preset to load
+*   @retval bool True on success
 */
 bool selectPreset(unsigned int nPreset)
 {
@@ -532,6 +552,7 @@ bool selectPreset(unsigned int nPreset)
 */
 void onNavigation(unsigned int nButton)
 {
+    cout << "onNavigation(" << nButton << ")" << endl;
     switch(g_nScreen)
     {
         case SCREEN_LOGO:
@@ -565,7 +586,7 @@ void onNavigation(unsigned int nButton)
     }
 }
 
-/**     Handle button press - powers off device */
+/** Handle button press - powers off device */
 void onButtonPower()
 {
     printf("Button pressed\n");
@@ -600,14 +621,14 @@ void onButtonPanic()
     panic();
 }
 
-/*     Handles signal */
+/**  Handles signal */
 void onSignal(int nSignal)
 {
     switch(nSignal)
     {
     	case SIGALRM:
     	    // We use alarm to drop back to performance screen after idle delay
-    		if(g_nScreen == SCREEN_LOGO)
+            if(g_nScreen == SCREEN_LOGO)
                 showScreen(SCREEN_PERFORMANCE);
             break;
     	case SIGINT:
@@ -619,7 +640,7 @@ void onSignal(int nSignal)
 }
 
 
-/**     Main application */
+/** Main application */
 int main(int argc, char** argv)
 {
     printf("riban fluidbox\n");
@@ -627,15 +648,6 @@ int main(int argc, char** argv)
     g_pScreen->LoadBitmap("logo.bmp", "logo");
     showScreen(SCREEN_LOGO); // Show logo at start up - will go to performance screen after idle delay or button press
     loadConfig();
-
-    // Configure buttons
-    wiringPiSetup();
-    wiringPiISR(BUTTON_POWER, INT_EDGE_FALLING, onButtonPower);
-    wiringPiISR(BUTTON_PANIC, INT_EDGE_FALLING, onButtonPanic);
-    wiringPiISR(BUTTON_UP, INT_EDGE_FALLING, onButtonUp);
-    wiringPiISR(BUTTON_DOWN, INT_EDGE_FALLING, onButtonDown);
-    wiringPiISR(BUTTON_LEFT, INT_EDGE_FALLING, onButtonLeft);
-    wiringPiISR(BUTTON_RIGHT, INT_EDGE_FALLING, onButtonRight);
 
     // Create and populate fluidsynth settings
     fluid_settings_t* pSettings = new_fluid_settings();
@@ -674,8 +686,17 @@ int main(int argc, char** argv)
     else
         cerr << "Failed to create audio driver" << endl;
 
-    // Select preset zero
-    selectPreset(0); //!@todo Populate g_nCurrentPreset with last selected preset
+    // Select preset
+    selectPreset(g_nCurrentPreset);
+
+    // Configure buttons
+    wiringPiSetupGpio();
+    wiringPiISR(BUTTON_POWER, INT_EDGE_FALLING, onButtonPower);
+    wiringPiISR(BUTTON_PANIC, INT_EDGE_FALLING, onButtonPanic);
+    wiringPiISR(BUTTON_UP, INT_EDGE_FALLING, onButtonUp);
+    wiringPiISR(BUTTON_DOWN, INT_EDGE_FALLING, onButtonDown);
+    wiringPiISR(BUTTON_LEFT, INT_EDGE_FALLING, onButtonLeft);
+    wiringPiISR(BUTTON_RIGHT, INT_EDGE_FALLING, onButtonRight);
 
     // Configure signal handlers
     signal(SIGALRM, onSignal);

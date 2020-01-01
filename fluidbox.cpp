@@ -271,10 +271,10 @@ void showProgramScreen()
 void showEditScreen()
 {
     g_pScreen->Clear();
-    g_pScreen->DrawRect(0,0, 160,16, BLUE, 0, BLUE);
+    g_pScreen->DrawRect(0,0, 160,16, OLIVE, 0, OLIVE);
     string sTitle = "Edit";
-    g_pScreen->DrawText(sTitle, 0, 0);
-    g_pScreen->DrawRect(0, g_nListSelection * 16 + 32, BLUE, 0, BLUE);
+    g_pScreen->DrawText(sTitle, 0, 16);
+    g_pScreen->DrawRect(0, g_nListSelection * 16 + 33, 160,  g_nListSelection * 16 + 49, BLUE, 0, BLUE);
     g_pScreen->DrawText("Edit preset", 0, 48);
     g_pScreen->DrawText("Add soundfont", 0, 64);
     g_pScreen->DrawText("Update", 0, 80);

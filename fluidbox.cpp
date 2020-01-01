@@ -11,7 +11,13 @@
 #define DEFAULT_SOUNDFONT "default/TimGM6mb.sf2"
 #define SF_ROOT "sf2/"
 #define MAX_PRESETS 127
-#define BUTTON 9
+#define CHANNELS_IN_PROG_SCREEN 6
+#define BUTTON_UP 4
+#define BUTTON_DOWN 17
+#define BUTTON_LEFT 27
+#define BUTTON_RIGHT 22
+#define BUTTON_PANIC 25
+#define BUTTON_POWER 9
 
 using namespace std;
 
@@ -19,8 +25,7 @@ enum {
     SCREEN_BLANK,
     SCREEN_LOGO,
     SCREEN_PERFORMANCE,
-    SCREEN_PROGRAM_1_8,
-    SCREEN_PROGRAM_9_16
+    SCREEN_PROGRAM
 };
 
 enum {
@@ -62,15 +67,17 @@ struct Preset {
     Chorus chorus;
 };
 
-fluid_synth_t* g_pSynth;
-ribanfblib* g_pScreen;
-unsigned int g_nCurrentPreset = 0;
-bool g_bPresetDirty = false;
-int g_nCurrentSoundfont = FLUID_FAILED;
-int g_nScreen = SCREEN_LOGO;
-int g_nRunState = 1;
-unsigned int g_nNoteCount[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-Preset g_presets[MAX_PRESETS];
+fluid_synth_t* g_pSynth; // Pointer to the synth object
+ribanfblib* g_pScreen; // Pointer to the screen object
+bool g_bPresetDirty = false; // True if preset 0 has been modified
+int g_nCurrentSoundfont = FLUID_FAILED; // ID of currently loaded soundfont
+int g_nScreen = SCREEN_LOGO; // ID of currently displayed screen - maybe should be derived from state model
+int g_nRunState = 1; // Current run state [1=running, 0=closing]
+unsigned int g_nNoteCount[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // Quantity of notes playing on each MIDI channel
+Preset g_presets[MAX_PRESETS]; // Preset configurations
+unsigned int g_nCurrentPreset = 0; // Index of the last selected preset
+unsigned int g_nSelectedChannel = 0; // Index of the selected (highlighted) program
+unsigned int g_nProgScreenFirst = 0; // Channel at top of program screen
 
 /**     Return a converted and vaildated value
 *       @param sValue Value as a string
@@ -158,18 +165,14 @@ void ShowPreset(int nPreset)
     g_pScreen->DrawText(sName, 0, 20);
 }
 
-/**     Updates the display of a program for the specified channel */
-void ShowProgram(int nChannel)
+/** Updates the display of a program for the specified channel
+    @param nChannel MIDI channel to display
+*/
+void showProgram(unsigned int nChannel)
 {
-    int nOffset = 0;
-    if(g_nScreen == SCREEN_PROGRAM_1_8 && nChannel < 8)
-        nOffset = 0;
-    else if(g_nScreen == SCREEN_PROGRAM_9_16 && nChannel > 7)
-        nOffset = 8;
-    else
+    if(g_nScreen != SCREEN_PROGRAM || nChannel < g_nProgScreenFirst || nChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
         return;
 
-    int nProgram, nBank, nSfId;
     fluid_synth_get_program(g_pSynth, nChannel, &nSfId, &nBank, &nProgram);
     fluid_sfont_t* pSoundfont = fluid_synth_get_sfont_by_id(g_pSynth, nSfId);
     if(pSoundfont)
@@ -181,8 +184,8 @@ void ShowProgram(int nChannel)
             sprintf(sPrefix, "%02d: ", nChannel);
             string sPreset = (char*)sPrefix;
             sPreset += fluid_preset_get_name(pPreset);
-            int nY = (nChannel - nOffset) * 16;
-            g_pScreen->DrawRect(0,nY, 160,nY+15, BLACK, 0, BLACK);
+            int nY = 32 + (nChannel - g_nProgScreenFirst) * 16;
+            g_pScreen->DrawRect(0,nY, 160,nY+15, BLACK, 0, (g_nSelectedChannel == nChannel)?BLUE:BLACK);
             g_pScreen->DrawText(sPreset.c_str(), 2, 15+nY, WHITE);
         }
     }
@@ -207,27 +210,65 @@ void showMidiActivity(int nChannel)
         g_pScreen->DrawRect(0,nY+15, 2,nY+15-nCount, RED, 0, RED); // Draw indicator
 }
 
-/**     Display the requested screen */
+void showPerformanceScreen()
+{
+    g_pScreen->Clear();
+    g_pScreen->DrawRect(0,0, 160,16, BLUE, 0, BLUE); //!@todo Use header colour to distinguish screens?
+    string sTitle = "riban fluidbox 0.1";
+    g_pScreen->DrawText(sTitle, 0, 0);
+    string sPreset;
+    if(g_bPresetDirty)
+        sPreset << "*";
+    else
+        sPreset << " ";
+    sPreset << g_presets[0]->name;
+    g_pScreen->DrawText(sPreset, 0, 32);
+    //!@todo Improve performance screen
+}
+
+/** Display list of programs for each channel in the currently selected preset
+*/
+void showProgramScreen()
+{
+    g_pScreen->Clear();
+    g_pScreen->DrawRect(0,0, 160,16, BLUE, 0, BLUE);
+    string sTitle = "Preset: ";
+    sTitle << to_string(g_nCurrentPreset) << " - Program Select";
+    g_pScreen->DrawText(sTitle, 0, 0);
+    int nSfId, nBank, nProgram;
+    // Ensure selected channel is in view
+    if(g_nSelectedChannel < g_nProgScreenFirst)
+        g_nProgScreenFirst = g_nSelectedChannel;
+    else if(g_nSelectedChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
+        g_nProgScreenFirst = g_nSelectedChannel - CHANNELS_IN_PROG_SCREEN; //!@todo validate CHANNELS_IN_PROG_SCREEN usage (may be one less)
+    for(unsigned int nChannel = g_nProgScreenFirst; nChannel < g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN; ++ nChannel)
+    {
+        if(nChannel > 15)
+            return;
+        showProgram(nChannel);
+    }
+}
+
+/** Display the requested screen
+    @param nScreen ID of screen to display
+*/
 void showScreen(int nScreen)
 {
     g_nScreen = nScreen;
     g_pScreen->Clear();
-    if(nScreen == SCREEN_BLANK)
-        return;
-    else if(nScreen == SCREEN_PROGRAM_1_8)
+    switch(nScreen)
     {
-        for(int nChannel = 0; nChannel < 8; ++nChannel)
-            ShowProgram(nChannel);
-    }
-    else if(nScreen == SCREEN_PROGRAM_9_16)
-    {
-        for(int nChannel = 8; nChannel < 16; ++nChannel)
-            ShowProgram(nChannel);
-    }
-    else if(nScreen == SCREEN_LOGO)
-    {
-        g_pScreen->LoadBitmap("logo.bmp", "logo");
-        g_pScreen->DrawBitmap("logo", 0, 0);
+        case SCREEN_PERFORMANCE:
+            showPerformanceScreen();
+            break;
+        case SCREEN_PROGRAM:
+            showProgramScreen();
+            break;
+        case SCREEN_BLANK:
+            return;
+        case SCREEN_LOGO:
+            g_pScreen->DrawBitmap("logo", 0, 0);
+            break;
     }
 }
 
@@ -245,7 +286,7 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
             string sKey = "midi.program_";
             sKey += to_string(nChannel);
             g_presets[0].program[nChannel].program = nProgram;
-            ShowProgram(nChannel);
+            showProgram(nChannel);
             break;
         }
         case 0x80: // Note off
@@ -339,7 +380,7 @@ bool loadConfig(string sFilename = "./fb.config")
             }
             else if (sParam.substr(0,7) == "reverb_")
             {
-                if(sParam.substr(7) == "enable") 
+                if(sParam.substr(7) == "enable")
                     g_presets[nIndex].reverb.enable = (sValue == "1");
                 if(sParam.substr(7) == "roomsize")
                     g_presets[nIndex].reverb.roomsize = validateDouble(sValue, 0.0, 1.0);
@@ -471,7 +512,7 @@ bool selectPreset(unsigned int nPreset)
 }
 
 /**     Handle button press - powers off device */
-void onButton()
+void onButtonPower()
 {
     printf("Button pressed\n");
     g_pScreen->Clear(BLUE);
@@ -480,22 +521,82 @@ void onButton()
     system("sudo poweroff");
 }
 
+void onButtonUp()
+{
+    onNavigation(BUTTON_UP);
+}
+
+void onButtonDown()
+{
+    onNavigation(BUTTON_DOWN);
+}
+
+void onButtonLeft()
+{
+    onNavigation(BUTTON_LEFT);
+}
+
+void onButtonRight()
+{
+    onNavigation(BUTTON_RIGHT);
+}
+
+void onButtonPanic()
+{
+    panic();
+}
+
+/** Handle navigation buttons
+    @param nButton Index of button pressed
+*/
+void onNavigation(unsigned int nButton)
+{
+    switch(g_nScreen)
+    {
+        case SCREEN_LOGO:
+            // Let's go somewhere useful if we are showing logo
+            showScreen(SCREEN_PERFORMANCE);
+            break;
+        case SCREEN_PERFORMANCE:
+            break;
+        case SCREEN_PROGRAM:
+            switch(nButton)
+            {
+                case BUTTON_UP:
+                    if(g_nSelectedChannel == 0)
+                        return;
+                    showProgram(g_nSelectedChannel, false);
+                    showProgram(--g_nSelectedChannel, true);
+                    break;
+                case BUTTON_DOWN:
+                    if(g_nSelectedChannel > 14)
+                        return;
+                    showProgram(g_nSelectedChannel, false);
+                    showProgram(++g_nSelectedChannel, true);
+                    break;
+                case BUTTON_LEFT:
+                    break;
+                case BUTTON_RIGHT:
+                    break;
+            }
+    }
+}
+
 /*     Handles signal */
 void onSignal(int nSignal)
 {
     switch(nSignal)
     {
     	case SIGALRM:
-    		if(g_nScreen == SCREEN_LOGO || g_nScreen == SCREEN_PROGRAM_1_8)
-        		showScreen(SCREEN_PROGRAM_1_8);
-    		if(g_nScreen == SCREEN_PROGRAM_9_16)
-        		showScreen(SCREEN_PROGRAM_9_16);
-		break;
+    	    // We use alarm to drop back to performance screen after idle delay
+    		if(g_nScreen == SCREEN_LOGO)
+                showScreen(SCREEN_PERFORMANCE);
+            break;
     	case SIGINT:
     	case SIGTERM:
-		printf("Recieved signal to quit...\n");
+            printf("Received signal to quit...\n");
         	g_nRunState = 0;
-		break;
+            break;
     }
 }
 
@@ -505,12 +606,20 @@ int main(int argc, char** argv)
 {
     printf("riban fluidbox\n");
     g_pScreen = new ribanfblib("/dev/fb1");
-    showScreen(SCREEN_LOGO);
+    g_pScreen->LoadBitmap("logo.bmp", "logo");
+    showScreen(SCREEN_LOGO); // Show logo at start up - will go to performance screen after idle delay or button press
     loadConfig();
-    wiringPiSetup();
-    wiringPiISR(BUTTON, INT_EDGE_FALLING, onButton);
 
-    // Create and populate settings
+    // Configure buttons
+    wiringPiSetup();
+    wiringPiISR(BUTTON_POWER, INT_EDGE_FALLING, onButtonPower);
+    wiringPiISR(BUTTON_PANIC, INT_EDGE_FALLING, onButtonPanic);
+    wiringPiISR(BUTTON_UP, INT_EDGE_FALLING, onButtonUp);
+    wiringPiISR(BUTTON_DOWN, INT_EDGE_FALLING, onButtonDown);
+    wiringPiISR(BUTTON_LEFT, INT_EDGE_FALLING, onButtonLeft);
+    wiringPiISR(BUTTON_RIGHT, INT_EDGE_FALLING, onButtonRight);
+
+    // Create and populate fluidsynth settings
     fluid_settings_t* pSettings = new_fluid_settings();
     fluid_settings_setint(pSettings, "midi.autoconnect", 1);
     fluid_settings_setint(pSettings, "synth.cpu-cores", 3);
@@ -548,14 +657,14 @@ int main(int argc, char** argv)
         cerr << "Failed to create audio driver" << endl;
 
     // Select preset zero
-    selectPreset(0);
+    selectPreset(0); //!@todo Populate g_nCurrentPreset with last selected preset
 
     // Configure signal handlers
     signal(SIGALRM, onSignal);
     signal(SIGINT, onSignal);
     signal(SIGTERM, onSignal);
 
-    // Show splash screen for a while
+    // Show splash screen for a while (idle delay)
     alarm(2);
 
     while(g_nRunState)
@@ -566,14 +675,13 @@ int main(int argc, char** argv)
     //Write configuration
     saveConfig();
 
-    g_pScreen->Clear();
-
     // Clean up
     delete_fluid_midi_router(pRouter);
     delete_fluid_audio_driver(pAudioDriver);
     delete_fluid_midi_driver(pMidiDriver);
     delete_fluid_synth(g_pSynth);
     delete_fluid_settings(pSettings);
+    g_pScreen->Clear();
     delete g_pScreen;
     return 0;
 }

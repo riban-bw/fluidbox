@@ -25,7 +25,8 @@ enum {
     SCREEN_BLANK,
     SCREEN_LOGO,
     SCREEN_PERFORMANCE,
-    SCREEN_PROGRAM
+    SCREEN_PROGRAM,
+    SCREEN_SELECT_PROGRAM
 };
 
 enum {
@@ -173,6 +174,7 @@ void showProgram(unsigned int nChannel)
     if(g_nScreen != SCREEN_PROGRAM || nChannel < g_nProgScreenFirst || nChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
         return;
 
+    int nSfId, nBank, nProgram;
     fluid_synth_get_program(g_pSynth, nChannel, &nSfId, &nBank, &nProgram);
     fluid_sfont_t* pSoundfont = fluid_synth_get_sfont_by_id(g_pSynth, nSfId);
     if(pSoundfont)
@@ -196,14 +198,9 @@ void showProgram(unsigned int nChannel)
 */
 void showMidiActivity(int nChannel)
 {
-    int nOffset = 0;
-    if(g_nScreen == SCREEN_PROGRAM_1_8 && nChannel < 8)
-        nOffset = 0;
-    else if(g_nScreen == SCREEN_PROGRAM_9_16 && nChannel > 7)
-        nOffset = 8;
-    else
+    if(g_nScreen != SCREEN_PROGRAM || nChannel < g_nProgScreenFirst || nChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
         return;
-    int nY = (nChannel - nOffset) * 16; //Upper left corner of channel indicator
+    int nY = 32 + (nChannel - g_nProgScreenFirst) * 16; //Upper left corner of channel indicator
     g_pScreen->DrawRect(0,nY, 2,nY+15, BLACK, 0, BLACK); // Clear the indicator
     int nCount = (g_nNoteCount[nChannel] < 16)?g_nNoteCount[nChannel]:15; // Limit max note indication to 15
     if(nCount)
@@ -215,14 +212,14 @@ void showPerformanceScreen()
     g_pScreen->Clear();
     g_pScreen->DrawRect(0,0, 160,16, BLUE, 0, BLUE); //!@todo Use header colour to distinguish screens?
     string sTitle = "riban fluidbox 0.1";
-    g_pScreen->DrawText(sTitle, 0, 0);
+    g_pScreen->DrawText(sTitle, 0, 15);
     string sPreset;
     if(g_bPresetDirty)
-        sPreset << "*";
+        sPreset = "*";
     else
-        sPreset << " ";
-    sPreset << g_presets[0]->name;
-    g_pScreen->DrawText(sPreset, 0, 32);
+        sPreset = " ";
+    sPreset += g_presets[0].name;
+    g_pScreen->DrawText(sPreset, 0, 50);
     //!@todo Improve performance screen
 }
 
@@ -233,9 +230,9 @@ void showProgramScreen()
     g_pScreen->Clear();
     g_pScreen->DrawRect(0,0, 160,16, BLUE, 0, BLUE);
     string sTitle = "Preset: ";
-    sTitle << to_string(g_nCurrentPreset) << " - Program Select";
+    sTitle += to_string(g_nCurrentPreset);
+    sTitle += " - Program Select";
     g_pScreen->DrawText(sTitle, 0, 0);
-    int nSfId, nBank, nProgram;
     // Ensure selected channel is in view
     if(g_nSelectedChannel < g_nProgScreenFirst)
         g_nProgScreenFirst = g_nSelectedChannel;
@@ -286,6 +283,7 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
             string sKey = "midi.program_";
             sKey += to_string(nChannel);
             g_presets[0].program[nChannel].program = nProgram;
+            g_bPresetDirty = true;
             showProgram(nChannel);
             break;
         }
@@ -469,6 +467,41 @@ bool loadSoundfont(string sFilename)
     return (g_nCurrentSoundfont >= 0);
 }
 
+/**  Copy a preset
+*    @param nSource Index of the source preset
+*    @param nDestination Index of the destination preset
+*    @retval bool True on success
+*/
+bool copyPreset(unsigned int nSource, unsigned int nDestination)
+{
+    if(nSource > MAX_PRESETS || nDestination > MAX_PRESETS || nSource == nDestination)
+        return false;
+    Preset* pPresetSrc = &(g_presets[nSource]);
+    Preset* pPresetDst = &(g_presets[nDestination]);
+    for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
+    {
+        pPresetDst->program[nChannel].program = pPresetSrc->program[nChannel].program;
+        pPresetDst->program[nChannel].bank = pPresetSrc->program[nChannel].bank;
+        pPresetDst->program[nChannel].level = pPresetSrc->program[nChannel].level;
+        pPresetDst->program[nChannel].balance = pPresetSrc->program[nChannel].balance;
+    }
+
+    pPresetDst->name = pPresetSrc->name;
+    pPresetDst->soundfont = pPresetSrc->soundfont;
+    pPresetDst->reverb.enable = pPresetSrc->reverb.enable;
+    pPresetDst->reverb.roomsize = pPresetSrc->reverb.roomsize;
+    pPresetDst->reverb.damping = pPresetSrc->reverb.damping;
+    pPresetDst->reverb.width = pPresetSrc->reverb.width;
+    pPresetDst->reverb.level = pPresetSrc->reverb.level;
+    pPresetDst->chorus.enable = pPresetSrc->chorus.enable;
+    pPresetDst->chorus.voicecount = pPresetSrc->chorus.voicecount;
+    pPresetDst->chorus.level = pPresetSrc->chorus.level;
+    pPresetDst->chorus.speed = pPresetSrc->chorus.speed;
+    pPresetDst->chorus.depth = pPresetSrc->chorus.depth;
+    pPresetDst->chorus.type = pPresetSrc->chorus.type;
+    return true;
+}
+
 /**     Select a preset
 *       @param nPreset Index of preset to load
 *       @retval bool True on success
@@ -477,38 +510,59 @@ bool selectPreset(unsigned int nPreset)
 {
     if(nPreset > MAX_PRESETS)
         return false;
-    Preset* pPreset = &(g_presets[nPreset]);
-    Preset* pPreset0 = &(g_presets[0]);
     // We use preset 0 for the currently selected and edited preset
-    if((nPreset == 0) || (pPreset->soundfont != pPreset0->soundfont))
-        if(!loadSoundfont(pPreset->soundfont))
+    Preset* pPreset = &(g_presets[0]);
+    if((nPreset == 0) || (pPreset->soundfont != g_presets[nPreset].soundfont))
+        if(!loadSoundfont(g_presets[nPreset].soundfont))
             return false;
-
+    copyPreset(nPreset, 0);
     for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
     {
         fluid_synth_program_select(g_pSynth, nChannel, g_nCurrentSoundfont, pPreset->program[nChannel].bank, pPreset->program[nChannel].program);
-        pPreset0->program[nChannel].program = pPreset->program[nChannel].program;
-        pPreset0->program[nChannel].bank = pPreset->program[nChannel].bank;
-        pPreset0->program[nChannel].level = pPreset->program[nChannel].level;
-        pPreset0->program[nChannel].balance = pPreset->program[nChannel].balance;
-        //!@todo set level and balance
+        fluid_synth_cc(g_pSynth, nChannel, 7, pPreset->program[nChannel].level);
+        fluid_synth_cc(g_pSynth, nChannel, 8, pPreset->program[nChannel].balance);
     }
-
-    //!@todo Extract this to a presetCopy function
-    pPreset0->name = pPreset->name;
-    pPreset0->soundfont = pPreset->soundfont;
-    pPreset0->reverb.enable = pPreset->reverb.enable;
-    pPreset0->reverb.roomsize = pPreset->reverb.roomsize;
-    pPreset0->reverb.damping = pPreset->reverb.damping;
-    pPreset0->reverb.width = pPreset->reverb.width;
-    pPreset0->reverb.level = pPreset->reverb.level;
-    pPreset0->chorus.enable = pPreset->chorus.enable;
-    pPreset0->chorus.voicecount = pPreset->chorus.voicecount;
-    pPreset0->chorus.level = pPreset->chorus.level;
-    pPreset0->chorus.speed = pPreset->chorus.speed;
-    pPreset0->chorus.depth = pPreset->chorus.depth;
-    pPreset0->chorus.type = pPreset->chorus.type;
+    g_nCurrentPreset = nPreset;
+    g_bPresetDirty = false;
     return true;
+}
+
+/** Handle navigation buttons
+    @param nButton Index of button pressed
+*/
+void onNavigation(unsigned int nButton)
+{
+    switch(g_nScreen)
+    {
+        case SCREEN_LOGO:
+            // Let's go somewhere useful if we are showing logo
+            showScreen(SCREEN_PERFORMANCE);
+            break;
+        case SCREEN_PERFORMANCE:
+            break;
+        case SCREEN_PROGRAM:
+            switch(nButton)
+            {
+                case BUTTON_UP:
+                    if(g_nSelectedChannel == 0)
+                        return;
+                    --g_nSelectedChannel;
+                    showScreen(SCREEN_PROGRAM);
+                    break;
+                case BUTTON_DOWN:
+                    if(g_nSelectedChannel > 14)
+                        return;
+                    ++g_nSelectedChannel;
+                    showScreen(SCREEN_PROGRAM);
+                    break;
+                case BUTTON_LEFT:
+                    showScreen(SCREEN_PERFORMANCE);
+                    break;
+                case BUTTON_RIGHT:
+                    showScreen(SCREEN_SELECT_PROGRAM);
+                    break;
+            }
+    }
 }
 
 /**     Handle button press - powers off device */
@@ -544,42 +598,6 @@ void onButtonRight()
 void onButtonPanic()
 {
     panic();
-}
-
-/** Handle navigation buttons
-    @param nButton Index of button pressed
-*/
-void onNavigation(unsigned int nButton)
-{
-    switch(g_nScreen)
-    {
-        case SCREEN_LOGO:
-            // Let's go somewhere useful if we are showing logo
-            showScreen(SCREEN_PERFORMANCE);
-            break;
-        case SCREEN_PERFORMANCE:
-            break;
-        case SCREEN_PROGRAM:
-            switch(nButton)
-            {
-                case BUTTON_UP:
-                    if(g_nSelectedChannel == 0)
-                        return;
-                    showProgram(g_nSelectedChannel, false);
-                    showProgram(--g_nSelectedChannel, true);
-                    break;
-                case BUTTON_DOWN:
-                    if(g_nSelectedChannel > 14)
-                        return;
-                    showProgram(g_nSelectedChannel, false);
-                    showProgram(++g_nSelectedChannel, true);
-                    break;
-                case BUTTON_LEFT:
-                    break;
-                case BUTTON_RIGHT:
-                    break;
-            }
-    }
 }
 
 /*     Handles signal */

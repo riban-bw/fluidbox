@@ -1,4 +1,5 @@
 #include "fluidsynth.h"
+#include "buttonhandler.hpp"
 #include "ribanfblib/ribanfblib.h"
 #include <wiringPi.h>
 #include <cstdio> //provides printf
@@ -681,9 +682,14 @@ void onNavigation(unsigned int nButton)
     }
 }
 
-void onButton(unsigned int nPin)
+void onButtonRelease(unsigned int nPin)
 {
-    cout << "Button: " << nPin << endl;
+    cout << "Button release: " << nPin << endl;
+}
+
+void onButtonPress(unsigned int nPin)
+{
+    cout << "Button press: " << nPin << endl;
     switch(nPin)
     {
         case BUTTON_UP:
@@ -702,14 +708,6 @@ void onButton(unsigned int nPin)
             panic();
             break;
     }
-}
-
-void debounce(int nPin)
-{
-    debouncePin[nPin] <<=1;
-    debouncePin[nPin] |= digitalRead(nPin);
-    if(debouncePin[nPin] == 0x7F)
-        onButton(nPin);
 }
 
 /**  Handles signal */
@@ -782,18 +780,13 @@ int main(int argc, char** argv)
 
     // Configure buttons
     wiringPiSetupGpio();
-    pinMode(BUTTON_POWER, INPUT);
-    pinMode(BUTTON_PANIC, INPUT);
-    pinMode(BUTTON_UP, INPUT);
-    pinMode(BUTTON_DOWN, INPUT);
-    pinMode(BUTTON_LEFT, INPUT);
-    pinMode(BUTTON_RIGHT, INPUT);
-    pullUpDnControl(BUTTON_POWER, PUD_UP);
-    pullUpDnControl(BUTTON_PANIC, PUD_UP);
-    pullUpDnControl(BUTTON_UP, PUD_UP);
-    pullUpDnControl(BUTTON_DOWN, PUD_UP);
-    pullUpDnControl(BUTTON_LEFT, PUD_UP);
-    pullUpDnControl(BUTTON_RIGHT, PUD_UP);
+    ButtonHandler buttonHandler;
+    buttonHandler.AddButton(BUTTON_POWER, onButtonPress, onButtonRelease);
+    buttonHandler.AddButton(BUTTON_PANIC, onButtonPress, onButtonRelease);
+    buttonHandler.AddButton(BUTTON_UP, onButtonPress, onButtonRelease);
+    buttonHandler.AddButton(BUTTON_DOWN, onButtonPress, onButtonRelease);
+    buttonHandler.AddButton(BUTTON_LEFT, onButtonPress, onButtonRelease);
+    buttonHandler.AddButton(BUTTON_RIGHT, onButtonPress, onButtonRelease);
 
     // Configure signal handlers
     signal(SIGALRM, onSignal);
@@ -805,12 +798,7 @@ int main(int argc, char** argv)
 
     while(g_nRunState)
     {
-        debounce(BUTTON_POWER);
-        debounce(BUTTON_PANIC);
-        debounce(BUTTON_UP);
-        debounce(BUTTON_DOWN);
-        debounce(BUTTON_LEFT);
-        debounce(BUTTON_RIGHT);
+        buttonHandler.Process();
         delay(5);
     }
         //pause();

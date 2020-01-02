@@ -66,7 +66,7 @@ class Button
                         m_nState = STATE_RELEASED;
                         if(m_fnOnRelease) m_fnOnRelease(m_nGpio);
                     }
-                    else if(millis() - m_nLastPress > m_nRepeatDelay)
+                    else if(m_nRepeatPeriod && millis() - m_nLastPress > m_nRepeatDelay)
                     {
                         m_nState = STATE_REPEAT;
                     }
@@ -112,7 +112,7 @@ class Button
         unsigned char m_cDebounce = 0x7f; // Button debounce filter state
         unsigned int m_nState = STATE_RELEASED; // Current state of button
         unsigned int m_nRepeatDelay = 500; // Period before auto button repeat triggers
-        unsigned int m_nRepeatPeriod = 100; // Period between auto button repeats
+        unsigned int m_nRepeatPeriod = 0; // Period between auto button repeats - zero to disable auto-repeat
 };
 
 /**	ButtonHandler class handles button events for multiple buttons connected via GPIO */
@@ -160,6 +160,7 @@ class ButtonHandler
 		/**	Set period before button hold is triggered
 		*	@param period Period in ms
 		*	@param gpio Index of gpio to configure [Default: All gpios are set]
+		*	@note  If auto-repeat is enabled and triggers before hold then hold will not trigger
 		*/
 		void SetHoldPeriod(unsigned int period, unsigned int gpio = -1)
 		{
@@ -176,7 +177,7 @@ class ButtonHandler
 		}
        
 		/**	Set period between auto-repeat triggers
-		*	@param period Period in ms
+		*	@param period Period in ms - set to zero to disable auto-repeat
 		*	@param gpio Index of gpio to configure [Default: All gpios are set]
 		*/
 		void SetRepeatPeriod(unsigned int period, unsigned int gpio = -1)

@@ -6,6 +6,7 @@
 #include <iostream> //provides streams
 #include <fstream> //provides file stream
 #include <map>
+#include <vector>
 #include <unistd.h> //provides pause
 #include <signal.h> //provides signal handling
 
@@ -29,16 +30,27 @@
 #define SPI_SCLK      11
 #define DISPLAY_DC    24
 #define DISPLAY_RESET 25
+#define DISPLAY_LED   12
 
 using namespace std;
 
 enum {
-    SCREEN_BLANK,
-    SCREEN_LOGO,
-    SCREEN_PERFORMANCE,
-    SCREEN_PROGRAM,
-    SCREEN_SELECT_PROGRAM,
-    SCREEN_EDIT
+	SCREEN_PERFORMANCE,
+	SCREEN_BLANK,
+	SCREEN_LOGO,
+	SCREEN_EDIT,
+	SCREEN_POWEROFF,
+	SCREEN_EDIT_PRESET,
+	SCREEN_PRESET_NAME,
+	SCREEN_PRESET_SF,
+	SCREEN_PRESET_PROGRAM,
+	SCREEN_EFFECTS,
+        SCREEN_MIXER,
+	SCREEN_SAVE,
+	SCREEN_UPDATE,
+	SCREEN_SOUNDFONT,
+	SCREEN_REBOOT,
+	SCREEN_EOL
 };
 
 enum {
@@ -48,12 +60,27 @@ enum {
 };
 
 enum {
+    EDIT_MIXER,
+    EDIT_EFFECTS,
     EDIT_PRESET,
-    EDIT_ADDSF,
+    EDIT_SOUNDFONT,
     EDIT_UPDATE,
     EDIT_REBOOT,
     EDIT_EOL
 };
+
+enum {
+    EDIT_PRESET_NAME,
+    EDIT_PRESET_SF,
+    EDIT_PRESET_PROGRAM,
+    EDIT_PRESET_EOL
+};
+
+enum {
+    EFFECTS_EOL
+};
+
+void showScreen(int nScreen);
 
 struct Program {
     string name = "New program";
@@ -101,6 +128,67 @@ unsigned int g_nSelectedChannel = 0; // Index of the selected (highlighted) prog
 unsigned int g_nProgScreenFirst = 0; // Channel at top of program screen
 unsigned int g_nListSelection = 0; // Currently highlighted entry in a list
 unsigned char debouncePin[32]; // Debounce streams for each GPIO pin
+
+// An entry in a list screen
+struct ListEntry {
+    string title; // Title to display in list
+    unsigned int screen = SCREEN_EOL; // Index of screen to navigate to on selection - default is none
+    std::function<void(void)> function = NULL;  // Function to call on selection - default is none - function template: void function(void)
+};
+
+// Screen containing a list
+struct ListScreen {
+    unsigned int selection = -1; // Index of selected item
+    std::vector<ListEntry*> entries; // List of entries
+    unsigned int first = 0; // Index of first item to display
+    bool initiated = false;
+    void draw()
+    {
+        g_pScreen->Clear();
+        g_pScreen->DrawRect(0,0, 160,16, BLUE, 0, BLUE);
+        int nY =  (1 + selection - first) * 16;
+        g_pScreen->DrawRect(0,nY, 160,nY+15, BLACK, 0, BLUE); // Draw highlight
+        for(unsigned int nRow = 0; nRow < 7; ++nRow)
+        {
+            if(nRow + first > entries.size() - 1)
+                return;
+            g_pScreen->DrawText(entries[nRow + first]->title, 2, 15+nY, WHITE);
+        }
+    };
+    void add(string title, unsigned int screen, std::function<void(void)> function = NULL)
+    {
+        ListEntry* pEntry = new ListEntry;
+        pEntry->title = title;
+        pEntry->screen = screen;
+        pEntry->function = function;
+        entries.push_back(pEntry);
+    };
+    void highlight(unsigned int id)
+    {
+        if(selection < entries.size())
+            selection = id;;
+    };
+    void select(unsigned int id)
+    {
+        if(selection < entries.size())
+        {
+            if(entries[selection]->function)
+                entries[selection]->function();
+            else
+                showScreen(entries[selection]->screen);
+        }
+    };
+    void next()
+    {
+        if(selection < entries.size() - 1)
+            ++selection;
+    };
+    void previous()
+    {
+        if(selection > 0)
+            --selection;
+    };
+};
 
 /**     Return a converted and vaildated value
 *       @param sValue Value as a string
@@ -177,6 +265,65 @@ void panic(int nMode=PANIC_NOTES, int nChannel=16)
     }
 }
 
+/** Save persistent data to configuration file */
+bool saveConfig(string sFilename = "./fb.config")
+{
+    ofstream fileConfig;
+    fileConfig.open(sFilename, ios::out);
+    if(!fileConfig.is_open())
+    {
+        printf("Error: Failed to open configuration: %s\n", sFilename.c_str());
+        return false;
+    }
+
+    // Save global settings
+    fileConfig << "[global]" << endl;
+    fileConfig << "preset=" << to_string(g_nCurrentPreset) << endl;
+
+    // Save presets
+    for(unsigned int nPreset = 0; nPreset < MAX_PRESETS; ++nPreset)
+    {
+        fileConfig << endl << "[preset_" << nPreset << "]" << endl;
+        fileConfig << endl << "name=" << g_presets[nPreset].name << endl;
+        fileConfig << endl << "soundfont=" << g_presets[nPreset].soundfont << endl;
+        for(unsigned int nProgram = 0; nProgram < 16; ++nProgram)
+        {
+            fileConfig << "prog_" << nProgram << "=" << g_presets[nPreset].program[nProgram].bank << ":" << g_presets[nPreset].program[nProgram].program << endl;
+            fileConfig << "level_" << nProgram << "=" << g_presets[nPreset].program[nProgram].level << endl;
+            fileConfig << "balance_" << nProgram << "=" << g_presets[nPreset].program[nProgram].balance << endl;
+        }
+        fileConfig << "reverb_enable=" <<  (g_presets[nPreset].reverb.enable?"1":"0") << endl;
+        fileConfig << "reverb_roomsize=" <<  g_presets[nPreset].reverb.roomsize << endl;
+        fileConfig << "reverb_damping=" <<  g_presets[nPreset].reverb.damping << endl;
+        fileConfig << "reverb_width=" <<  g_presets[nPreset].reverb.width << endl;
+        fileConfig << "reverb_level=" <<  g_presets[nPreset].reverb.level << endl;
+        fileConfig << "chorus_enable=" <<  g_presets[nPreset].chorus.enable << endl;
+        fileConfig << "chorus_voicecount=" <<  g_presets[nPreset].chorus.voicecount << endl;
+        fileConfig << "chorus_level=" <<  g_presets[nPreset].chorus.level << endl;
+        fileConfig << "chorus_speed=" <<  g_presets[nPreset].chorus.speed << endl;
+        fileConfig << "chorus_depth=" <<  g_presets[nPreset].chorus.depth << endl;
+        fileConfig << "chorus_type=" <<  g_presets[nPreset].chorus.type << endl;
+    }
+    fileConfig.close();
+    return true;
+}
+
+void reboot()
+{
+    g_pScreen->Clear(BLUE);
+    g_pScreen->DrawText("Rebooting...", 10, 30);
+    saveConfig();
+    system("sudo reboot");
+}
+
+void powerOff()
+{
+    g_pScreen->Clear(BLUE);
+    g_pScreen->DrawText("Shutting down...", 10, 30);
+    saveConfig();
+    system("sudo poweroff");
+}
+
 void ShowPreset(int nPreset)
 {
     if(nPreset > MAX_PRESETS)
@@ -193,7 +340,7 @@ void ShowPreset(int nPreset)
 */
 void showProgram(unsigned int nChannel)
 {
-    if(g_nScreen != SCREEN_PROGRAM || nChannel < g_nProgScreenFirst || nChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
+    if(g_nScreen != SCREEN_PRESET_PROGRAM || nChannel < g_nProgScreenFirst || nChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
         return;
 
     int nSfId, nBank, nProgram;
@@ -220,7 +367,7 @@ void showProgram(unsigned int nChannel)
 */
 void showMidiActivity(int nChannel)
 {
-    if(g_nScreen != SCREEN_PROGRAM || nChannel < g_nProgScreenFirst || nChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
+    if(g_nScreen != SCREEN_PRESET_PROGRAM || nChannel < g_nProgScreenFirst || nChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
         return;
     int nY = 32 + (nChannel - g_nProgScreenFirst) * 16; //Upper left corner of channel indicator
     g_pScreen->DrawRect(0,nY, 2,nY+15, BLACK, 0, BLACK); // Clear the indicator
@@ -271,15 +418,31 @@ void showProgramScreen()
 /**  Display edit options (utility menu) */
 void showEditScreen()
 {
+    static ListScreen listbox;
+    if(!listbox.initiated)
+    {
+        listbox.add("Mixer", SCREEN_MIXER);
+        listbox.add("Effects", SCREEN_EFFECTS);
+        listbox.add("Edit preset", SCREEN_EDIT_PRESET);
+        listbox.add("Manage soundfonts", SCREEN_SOUNDFONT);
+        listbox.add("Update", SCREEN_UPDATE);
+        listbox.add("Reboot", SCREEN_REBOOT);
+        listbox.initiated = true;
+    }
+
     g_pScreen->Clear();
     g_pScreen->DrawRect(0,0, 160,16, OLIVE, 0, OLIVE);
     string sTitle = "Edit";
     g_pScreen->DrawText(sTitle, 0, 16);
-    g_pScreen->DrawRect(0, g_nListSelection * 16 + 33, 160,  g_nListSelection * 16 + 49, BLUE, 0, BLUE);
-    g_pScreen->DrawText("Edit preset", 0, 48);
-    g_pScreen->DrawText("Add soundfont", 0, 64);
-    g_pScreen->DrawText("Update", 0, 80);
-    g_pScreen->DrawText("Reboot", 0, 96);
+    listbox.draw();
+}
+
+//  Save config and safely power off device
+void showPoweroffScreen()
+{
+    g_pScreen->Clear(BLUE);
+    g_pScreen->DrawText("Power off?", 10, 30);
+    g_pScreen->DrawText("<-NO    YES->", 10,50);
 }
 
 /** Display the requested screen
@@ -294,7 +457,7 @@ void showScreen(int nScreen)
         case SCREEN_PERFORMANCE:
             showPerformanceScreen();
             break;
-        case SCREEN_PROGRAM:
+        case SCREEN_PRESET_PROGRAM:
             showProgramScreen();
             break;
         case SCREEN_EDIT:
@@ -305,6 +468,8 @@ void showScreen(int nScreen)
         case SCREEN_LOGO:
             g_pScreen->DrawBitmap("logo", 0, 0);
             break;
+        case SCREEN_POWEROFF:
+            showPoweroffScreen();
     }
 }
 
@@ -454,49 +619,6 @@ bool loadConfig(string sFilename = "./fb.config")
     return true;
 }
 
-/** Save persistent data to configuration file */
-bool saveConfig(string sFilename = "./fb.config")
-{
-    ofstream fileConfig;
-    fileConfig.open(sFilename, ios::out);
-    if(!fileConfig.is_open())
-    {
-        printf("Error: Failed to open configuration: %s\n", sFilename.c_str());
-        return false;
-    }
-
-    // Save global settings
-    fileConfig << "[global]" << endl;
-    fileConfig << "preset=" << to_string(g_nCurrentPreset) << endl;
-
-    // Save presets
-    for(unsigned int nPreset = 0; nPreset < MAX_PRESETS; ++nPreset)
-    {
-        fileConfig << endl << "[preset_" << nPreset << "]" << endl;
-        fileConfig << endl << "name=" << g_presets[nPreset].name << endl;
-        fileConfig << endl << "soundfont=" << g_presets[nPreset].soundfont << endl;
-        for(unsigned int nProgram = 0; nProgram < 16; ++nProgram)
-        {
-            fileConfig << "prog_" << nProgram << "=" << g_presets[nPreset].program[nProgram].bank << ":" << g_presets[nPreset].program[nProgram].program << endl;
-            fileConfig << "level_" << nProgram << "=" << g_presets[nPreset].program[nProgram].level << endl;
-            fileConfig << "balance_" << nProgram << "=" << g_presets[nPreset].program[nProgram].balance << endl;
-        }
-        fileConfig << "reverb_enable=" <<  (g_presets[nPreset].reverb.enable?"1":"0") << endl;
-        fileConfig << "reverb_roomsize=" <<  g_presets[nPreset].reverb.roomsize << endl;
-        fileConfig << "reverb_damping=" <<  g_presets[nPreset].reverb.damping << endl;
-        fileConfig << "reverb_width=" <<  g_presets[nPreset].reverb.width << endl;
-        fileConfig << "reverb_level=" <<  g_presets[nPreset].reverb.level << endl;
-        fileConfig << "chorus_enable=" <<  g_presets[nPreset].chorus.enable << endl;
-        fileConfig << "chorus_voicecount=" <<  g_presets[nPreset].chorus.voicecount << endl;
-        fileConfig << "chorus_level=" <<  g_presets[nPreset].chorus.level << endl;
-        fileConfig << "chorus_speed=" <<  g_presets[nPreset].chorus.speed << endl;
-        fileConfig << "chorus_depth=" <<  g_presets[nPreset].chorus.depth << endl;
-        fileConfig << "chorus_type=" <<  g_presets[nPreset].chorus.type << endl;
-    }
-    fileConfig.close();
-    return true;
-}
-
 /** Loads a soundfont from file, unloading previously loaded soundfont */
 bool loadSoundfont(string sFilename)
 {
@@ -582,10 +704,11 @@ bool selectPreset(unsigned int nPreset)
 */
 void onNavigation(unsigned int nButton)
 {
+    unsigned int nScreen = g_nScreen;
     switch(g_nScreen)
     {
         case SCREEN_LOGO:
-            // Let's go somewhere useful if we are showing logo
+        case SCREEN_BLANK:
             showScreen(SCREEN_PERFORMANCE);
             break;
         case SCREEN_PERFORMANCE:
@@ -598,12 +721,13 @@ void onNavigation(unsigned int nButton)
                     showScreen(SCREEN_PERFORMANCE);
                     break;
                 case BUTTON_DOWN:
-                    if(g_nCurrentPreset > MAX_PRESETS - 2)
+                    if(g_nCurrentPreset > MAX_PRESETS -1)
                         return;
                     selectPreset(++g_nCurrentPreset);
                     showScreen(SCREEN_PERFORMANCE);
                     break;
                 case BUTTON_RIGHT:
+                    g_nListSelection = 0; //!@todo Can we re-enter screen at same point? Will it interfer with other lists?
                     showScreen(SCREEN_EDIT);
                     break;
                 case BUTTON_LEFT:
@@ -628,14 +752,23 @@ void onNavigation(unsigned int nButton)
                 case BUTTON_RIGHT:
                     switch(g_nListSelection)
                     {
-                        case EDIT_PRESET:
-                            showScreen(SCREEN_PROGRAM); //!@todo Add preset edit screen
+                        case EDIT_MIXER:
+                            showScreen(SCREEN_MIXER);
                             break;
-                        case EDIT_ADDSF:
+                        case EDIT_EFFECTS:
+                            showScreen(SCREEN_EFFECTS);
+                            break;
+                        case EDIT_PRESET:
+                            showScreen(SCREEN_EDIT_PRESET);
+                            break;
+                        case EDIT_SOUNDFONT:
+                            showScreen(SCREEN_SOUNDFONT);
                             break;
                         case EDIT_UPDATE:
+                            showScreen(SCREEN_UPDATE);
                             break;
                         case EDIT_REBOOT:
+                            reboot();
                             break;
                     }
                     break;
@@ -644,28 +777,147 @@ void onNavigation(unsigned int nButton)
                     break;
             }
             break;
-        case SCREEN_PROGRAM:
+        case SCREEN_POWEROFF:
+            switch(nButton)
+            {
+                case BUTTON_RIGHT:
+                    powerOff();
+                    break;
+                case BUTTON_LEFT:
+                    showScreen(SCREEN_PERFORMANCE);
+                    break;
+            }
+        case SCREEN_EDIT_PRESET:
+            switch(nButton)
+            {
+                case BUTTON_UP:
+                    if(g_nListSelection)
+                    {
+                        --g_nListSelection;
+                        showScreen(SCREEN_EDIT_PRESET);
+                    }
+                    break;
+                case BUTTON_DOWN:
+                    if(g_nListSelection < EDIT_PRESET_EOL)
+                    {
+                        ++g_nListSelection;
+                        showScreen(SCREEN_EDIT_PRESET);
+                    }
+                    break;
+                case BUTTON_RIGHT:
+                    switch(g_nListSelection)
+                    {
+                        case EDIT_PRESET_NAME:
+                            showScreen(SCREEN_PRESET_NAME);
+                            break;
+                        case EDIT_PRESET_SF:
+                            showScreen(SCREEN_PRESET_SF);
+                            break;
+                        case EDIT_PRESET_PROGRAM:
+                            showScreen(SCREEN_PRESET_PROGRAM);
+                            break;
+                    }
+                    break;
+                case BUTTON_LEFT:
+                    break;
+            }
+            break;
+        case SCREEN_PRESET_NAME:
+            switch(nButton)
+            {
+                case BUTTON_UP:
+                    break;
+                case BUTTON_DOWN:
+                    break;
+                case BUTTON_RIGHT:
+                    break;
+                case BUTTON_LEFT:
+                    break;
+            }
+            break;
+        SCREEN_PRESET_SF:
+            switch(nButton)
+            {
+                case BUTTON_UP:
+                    break;
+                case BUTTON_DOWN:
+                    break;
+                case BUTTON_RIGHT:
+                    break;
+                case BUTTON_LEFT:
+                    break;
+            }
+            break;
+        case SCREEN_PRESET_PROGRAM:
             switch(nButton)
             {
                 case BUTTON_UP:
                     if(g_nSelectedChannel == 0)
                         return;
                     --g_nSelectedChannel;
-                    showScreen(SCREEN_PROGRAM);
+                    showScreen(SCREEN_PRESET_PROGRAM);
                     break;
                 case BUTTON_DOWN:
                     if(g_nSelectedChannel > 14)
                         return;
                     ++g_nSelectedChannel;
-                    showScreen(SCREEN_PROGRAM);
+                    showScreen(SCREEN_PRESET_PROGRAM);
                     break;
                 case BUTTON_LEFT:
-                    showScreen(SCREEN_PERFORMANCE);
+                    showScreen(SCREEN_EDIT_PRESET);
                     break;
                 case BUTTON_RIGHT:
-                    showScreen(SCREEN_SELECT_PROGRAM);
+                    showScreen(SCREEN_EDIT_PRESET);
                     break;
             }
+        case SCREEN_EFFECTS:
+            switch(nButton)
+            { //!@todo handle value changes
+                case BUTTON_UP:
+                    if(g_nListSelection)
+                    {
+                        --g_nListSelection;
+                        showScreen(SCREEN_EFFECTS);
+                    }
+                    break;
+                case BUTTON_DOWN:
+                    if(g_nListSelection >= EFFECTS_EOL)
+                        return;
+                    ++g_nListSelection;
+                    showScreen(SCREEN_EFFECTS);
+                    break;
+                case BUTTON_RIGHT:
+                    break;
+                case BUTTON_LEFT:
+                    break;
+            }
+            break;
+        case SCREEN_MIXER:
+            switch(nButton)
+            {
+                case BUTTON_UP:
+                    break;
+                case BUTTON_DOWN:
+                    break;
+                case BUTTON_RIGHT:
+                    break;
+                case BUTTON_LEFT:
+                    break;
+            }
+            break;
+        case SCREEN_SAVE:
+            switch(nButton)
+            {
+                case BUTTON_UP:
+                    break;
+                case BUTTON_DOWN:
+                    break;
+                case BUTTON_RIGHT:
+                    break;
+                case BUTTON_LEFT:
+                    break;
+            }
+            break;
         default:
             switch(nButton)
             {
@@ -682,29 +934,21 @@ void onNavigation(unsigned int nButton)
     }
 }
 
-void onButtonRelease(unsigned int nPin)
+void onLeftHold(unsigned int nGpio)
 {
-    cout << "Button release: " << nPin << endl;
+    switch(g_nScreen)
+    {
+        case SCREEN_PERFORMANCE:
+            showScreen(SCREEN_POWEROFF);
+            break;
+    }
 }
 
-void onButtonPress(unsigned int nPin)
+void onRightHold(unsigned int nGpio)
 {
-    cout << "Button press: " << nPin << endl;
-    switch(nPin)
+    switch(g_nScreen)
     {
-        case BUTTON_UP:
-        case BUTTON_DOWN:
-        case BUTTON_RIGHT:
-        case BUTTON_LEFT:
-            onNavigation(nPin);
-            break;
-        case BUTTON_POWER:
-            g_pScreen->Clear(BLUE);
-            g_pScreen->DrawText("Shutting down...", 10, 30);
-            saveConfig();
-            //system("sudo poweroff");
-            break;
-        case BUTTON_PANIC:
+        case SCREEN_PERFORMANCE:
             panic();
             break;
     }
@@ -781,12 +1025,12 @@ int main(int argc, char** argv)
     // Configure buttons
     wiringPiSetupGpio();
     ButtonHandler buttonHandler;
-    buttonHandler.AddButton(BUTTON_POWER, onButtonPress, onButtonRelease);
-    buttonHandler.AddButton(BUTTON_PANIC, onButtonPress, onButtonRelease);
-    buttonHandler.AddButton(BUTTON_UP, onButtonPress, onButtonRelease);
-    buttonHandler.AddButton(BUTTON_DOWN, onButtonPress, onButtonRelease);
-    buttonHandler.AddButton(BUTTON_LEFT, onButtonPress, onButtonRelease);
-    buttonHandler.AddButton(BUTTON_RIGHT, onButtonPress, onButtonRelease);
+    buttonHandler.AddButton(BUTTON_UP, onNavigation);
+    buttonHandler.AddButton(BUTTON_DOWN, onNavigation);
+    buttonHandler.AddButton(BUTTON_LEFT, onNavigation, NULL, onLeftHold);
+    buttonHandler.AddButton(BUTTON_RIGHT, onNavigation, NULL, onRightHold);
+    buttonHandler.SetRepeatPeriod(BUTTON_UP, 100);
+    buttonHandler.SetRepeatPeriod(BUTTON_DOWN, 100);
 
     // Configure signal handlers
     signal(SIGALRM, onSignal);

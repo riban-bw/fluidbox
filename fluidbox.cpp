@@ -137,22 +137,31 @@ struct ListEntry {
 };
 
 // Screen containing a list
-struct ListScreen {
-    unsigned int selection = -1; // Index of selected item
-    std::vector<ListEntry*> entries; // List of entries
-    unsigned int first = 0; // Index of first item to display
+struct ListScreen
+{
+    string title;
+    unsigned int nSelection = -1; // Index of selected item
+    std::vector<ListEntry*> vEntries; // List of entries
+    unsigned int nFirstEntry = 0; // Index of first item to display
     bool initiated = false;
     void draw()
     {
         g_pScreen->Clear();
+        // Draw title
         g_pScreen->DrawRect(0,0, 160,16, BLUE, 0, BLUE);
-        int nY =  (1 + selection - first) * 16;
-        g_pScreen->DrawRect(0,nY, 160,nY+15, BLACK, 0, BLUE); // Draw highlight
+        g_pScreen->DrawText(title, 0, 15, WHITE);
+        int nY = 1 + nSelection - nFirstEntry) * 16;
+        // Draw highlight
+        if(nSelection > -1)
+        {
+            g_pScreen->DrawRect(0,nY, 160,nY+15, BLUE, 0, BLUE);
+        }
+        // Draw entries
         for(unsigned int nRow = 0; nRow < 7; ++nRow)
         {
-            if(nRow + first > entries.size() - 1)
-                return;
-            g_pScreen->DrawText(entries[nRow + first]->title, 2, 15+nY, WHITE);
+            if(nRow + nFirstEntry > vEntries.size() - 1)
+                return; // Reached end of list
+            g_pScreen->DrawText(vEntries[nRow + nFirstEntry]->title, 2, 15+nY, WHITE);
         }
     };
     void add(string title, unsigned int screen, std::function<void(void)> function = NULL)
@@ -161,32 +170,32 @@ struct ListScreen {
         pEntry->title = title;
         pEntry->screen = screen;
         pEntry->function = function;
-        entries.push_back(pEntry);
+        vEntries.push_back(pEntry);
     };
     void highlight(unsigned int id)
     {
-        if(selection < entries.size())
-            selection = id;;
+        if(nSelection < vEntries.size())
+            nSelection = id;;
     };
     void select(unsigned int id)
     {
-        if(selection < entries.size())
+        if(nSelection < vEntries.size())
         {
-            if(entries[selection]->function)
-                entries[selection]->function();
+            if(vEntries[nSelection]->function)
+                vEntries[nSelection]->function();
             else
-                showScreen(entries[selection]->screen);
+                showScreen(vEntries[nSelection]->screen);
         }
     };
     void next()
     {
-        if(selection < entries.size() - 1)
-            ++selection;
+        if(nSelection < vEntries.size() - 1)
+            ++nSelection;
     };
     void previous()
     {
-        if(selection > 0)
-            --selection;
+        if(nSelection > 0)
+            --nSelection;
     };
 };
 
@@ -418,23 +427,19 @@ void showProgramScreen()
 /**  Display edit options (utility menu) */
 void showEditScreen()
 {
-    static ListScreen listbox;
-    if(!listbox.initiated)
+    static ListScreen listscreen;
+    if(!listscreen.initiated)
     {
-        listbox.add("Mixer", SCREEN_MIXER);
-        listbox.add("Effects", SCREEN_EFFECTS);
-        listbox.add("Edit preset", SCREEN_EDIT_PRESET);
-        listbox.add("Manage soundfonts", SCREEN_SOUNDFONT);
-        listbox.add("Update", SCREEN_UPDATE);
-        listbox.add("Reboot", SCREEN_REBOOT);
-        listbox.initiated = true;
+        listscreen.title = "Edit";
+        listscreen.add("Mixer", SCREEN_MIXER);
+        listscreen.add("Effects", SCREEN_EFFECTS);
+        listscreen.add("Edit preset", SCREEN_EDIT_PRESET);
+        listscreen.add("Manage soundfonts", SCREEN_SOUNDFONT);
+        listscreen.add("Update", SCREEN_UPDATE);
+        listscreen.add("Reboot", SCREEN_REBOOT);
+        listscreen.initiated = true;
     }
-
-    g_pScreen->Clear();
-    g_pScreen->DrawRect(0,0, 160,16, OLIVE, 0, OLIVE);
-    string sTitle = "Edit";
-    g_pScreen->DrawText(sTitle, 0, 16);
-    listbox.draw();
+    listscreen.draw();
 }
 
 //  Save config and safely power off device
@@ -681,13 +686,11 @@ bool selectPreset(unsigned int nPreset)
 {
     if(nPreset > MAX_PRESETS)
         return false;
-    // We use preset 0 for the currently selected and edited preset
     cout << "Select preset " << nPreset << endl;
-    Preset* pPreset = &(g_presets[0]);
+    Preset* pPreset = &(g_presets[nPreset]);
     //if(pPreset->soundfont != g_presets[nPreset].soundfont))
-        if(!loadSoundfont(g_presets[nPreset].soundfont))
+        if(!loadSoundfont(pPreset->soundfont))
             return false;
-    copyPreset(nPreset, 0);
     for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
     {
         fluid_synth_program_select(g_pSynth, nChannel, g_nCurrentSoundfont, pPreset->program[nChannel].bank, pPreset->program[nChannel].program);
@@ -695,7 +698,6 @@ bool selectPreset(unsigned int nPreset)
         fluid_synth_cc(g_pSynth, nChannel, 8, pPreset->program[nChannel].balance);
     }
     g_nCurrentPreset = nPreset;
-    g_bPresetDirty = false;
     return true;
 }
 
@@ -714,13 +716,13 @@ void onNavigation(unsigned int nButton)
         case SCREEN_PERFORMANCE:
             switch(nButton)
             {
-                case BUTTON_UP:
-                    if(g_nCurrentPreset < 2)
+                case BUTTON_DOWN:
+                    if(g_nCurrentPreset == 0)
                         return;
                     selectPreset(--g_nCurrentPreset);
                     showScreen(SCREEN_PERFORMANCE);
                     break;
-                case BUTTON_DOWN:
+                case BUTTON_UP:
                     if(g_nCurrentPreset > MAX_PRESETS -1)
                         return;
                     selectPreset(++g_nCurrentPreset);

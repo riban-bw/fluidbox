@@ -6,10 +6,10 @@
 #include <cstdio> //provides printf
 #include <iostream> //provides streams
 #include <fstream> //provides file stream
-#include <map>
-#include <vector>
-#include <unistd.h> //provides pause
+#include <unistd.h> //provides pause, alarm
 #include <signal.h> //provides signal handling
+#include <vector>
+#include <map>
 
 #define DEFAULT_SOUNDFONT "default/TimGM6mb.sf2"
 #define SF_ROOT "sf2/"
@@ -40,7 +40,7 @@ enum {
 	SCREEN_BLANK,
 	SCREEN_LOGO,
 	SCREEN_EDIT,
-	SCREEN_POWEROFF,
+	SCREEN_POWER,
 	SCREEN_EDIT_PRESET,
 	SCREEN_PRESET_NAME,
 	SCREEN_PRESET_SF,
@@ -61,27 +61,20 @@ enum {
 };
 
 enum {
-    EDIT_MIXER,
-    EDIT_EFFECTS,
-    EDIT_PRESET,
-    EDIT_SOUNDFONT,
-    EDIT_UPDATE,
-    EDIT_REBOOT,
-    EDIT_EOL
+    POWER_OFF,
+    POWER_OFF_SAVE,
+    POWER_REBOOT,
+    POWER_REBOOT_SAVE
 };
 
 enum {
-    EDIT_PRESET_NAME,
-    EDIT_PRESET_SF,
-    EDIT_PRESET_PROGRAM,
-    EDIT_PRESET_EOL
+    REVERB_ENABLE,
+    REVERB_ROOMSIZE,
+    REVERB_DAMPING,
+    REVERB_WIDTH,
+    REVERB_LEVEL
 };
 
-enum {
-    EFFECTS_EOL
-};
-
-void showScreen(int nScreen);
 
 struct Program {
     string name = "New program";
@@ -120,7 +113,6 @@ struct Preset {
 fluid_synth_t* g_pSynth; // Pointer to the synth object
 ribanfblib* g_pScreen; // Pointer to the screen object
 int g_nCurrentSoundfont = FLUID_FAILED; // ID of currently loaded soundfont
-int g_nScreen = SCREEN_LOGO; // ID of currently displayed screen - maybe should be derived from state model
 int g_nRunState = 1; // Current run state [1=running, 0=closing]
 unsigned int g_nNoteCount[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // Quantity of notes playing on each MIDI channel
 Preset g_presets[MAX_PRESETS]; // Preset configurations
@@ -130,8 +122,8 @@ unsigned int g_nProgScreenFirst = 0; // Channel at top of program screen
 unsigned int g_nListSelection = 0; // Currently highlighted entry in a list
 unsigned char debouncePin[32]; // Debounce streams for each GPIO pin
 
-ListScreen* g_pScreenEdit;
-ListScreen* g_pScreenEditPreset;
+map<unsigned int,ListScreen*> g_mapScreens;
+unsigned int g_nCurrentScreen;
 
 
 /**     Return a converted and vaildated value
@@ -252,31 +244,48 @@ bool saveConfig(string sFilename = "./fb.config")
     return true;
 }
 
-void reboot()
+void power(unsigned int nAction)
 {
-    g_pScreen->Clear(BLUE);
-    g_pScreen->DrawText("Rebooting...", 10, 30);
-    saveConfig();
-    system("sudo reboot");
+    string sCommand, sMessage;
+    switch(nAction)
+    {
+        case POWER_OFF:
+            sCommand = "sudo poweroff";
+            sMessage = "POWERING DOWN";
+            break;
+        case POWER_OFF_SAVE:
+            saveConfig();
+            sCommand = "sudo poweroff";
+            sMessage = "POWERING DOWN";
+            break;
+        case POWER_REBOOT:
+            sCommand = "sudo reboot";
+            sMessage = "REBOOTING";
+            break;
+        case POWER_REBOOT_SAVE:
+            saveConfig();
+            sCommand = "sudo reboot";
+            sMessage = "REBOOTING";
+            break;
+        default:
+            return;
+    }
+    g_pScreen->Clear(RED);
+    g_pScreen->DrawText(sMessage, 0, 60);
+    system(sCommand.c_str());
 }
 
-void powerOff()
+void editReverb(unsigned int nParam)
 {
-    g_pScreen->Clear(BLUE);
-    g_pScreen->DrawText("Shutting down...", 10, 30);
-    saveConfig();
-    system("sudo poweroff");
-}
-
-void ShowPreset(int nPreset)
-{
-    if(nPreset > MAX_PRESETS)
-        return;
-    string sName = to_string(nPreset);
-    sName += ": ";
-    sName += g_presets[nPreset].name;
-    g_pScreen->Clear();
-    g_pScreen->DrawText(sName, 0, 20);
+    switch(nParam)
+    {
+        case REVERB_ENABLE:
+        case REVERB_ROOMSIZE:
+        case REVERB_DAMPING:
+        case REVERB_WIDTH:
+        case REVERB_LEVEL:
+            break;
+    }
 }
 
 /** Updates the display of a program for the specified channel
@@ -284,7 +293,7 @@ void ShowPreset(int nPreset)
 */
 void showProgram(unsigned int nChannel)
 {
-    if(g_nScreen != SCREEN_PRESET_PROGRAM || nChannel < g_nProgScreenFirst || nChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
+    if(g_nCurrentScreen != SCREEN_PRESET_PROGRAM || nChannel < g_nProgScreenFirst || nChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
         return;
 
     int nSfId, nBank, nProgram;
@@ -311,7 +320,7 @@ void showProgram(unsigned int nChannel)
 */
 void showMidiActivity(int nChannel)
 {
-    if(g_nScreen != SCREEN_PRESET_PROGRAM || nChannel < g_nProgScreenFirst || nChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
+    if(g_nCurrentScreen != SCREEN_PRESET_PROGRAM || nChannel < g_nProgScreenFirst || nChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
         return;
     int nY = 32 + (nChannel - g_nProgScreenFirst) * 16; //Upper left corner of channel indicator
     g_pScreen->DrawRect(0,nY, 2,nY+15, BLACK, 0, BLACK); // Clear the indicator
@@ -320,85 +329,17 @@ void showMidiActivity(int nChannel)
         g_pScreen->DrawRect(0,nY+15, 2,nY+15-nCount, RED, 0, RED); // Draw indicator
 }
 
-void showPerformanceScreen()
-{
-    g_pScreen->Clear();
-    g_pScreen->DrawRect(0,0, 160,16, BLUE, 0, BLUE); //!@todo Use header colour to distinguish screens?
-    string sTitle = "riban fluidbox 0.1";
-    g_pScreen->DrawText(sTitle, 0, 15);
-    Preset* pPreset = &g_presets[g_nCurrentPreset];
-    string sPreset;
-    if(pPreset->dirty)
-        sPreset = "*";
-    else
-        sPreset = " ";
-    sPreset += pPreset->name;
-    g_pScreen->DrawText(sPreset, 0, 50);
-}
-
-/** Display list of programs for each channel in the currently selected preset
-*/
-void showProgramScreen()
-{
-    g_pScreen->Clear();
-    g_pScreen->DrawRect(0,0, 160,16, BLUE, 0, BLUE);
-    string sTitle = "Preset: ";
-    sTitle += to_string(g_nCurrentPreset);
-    sTitle += " - Program Select";
-    g_pScreen->DrawText(sTitle, 0, 0);
-    // Ensure selected channel is in view
-    if(g_nSelectedChannel < g_nProgScreenFirst)
-        g_nProgScreenFirst = g_nSelectedChannel;
-    else if(g_nSelectedChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
-        g_nProgScreenFirst = g_nSelectedChannel - CHANNELS_IN_PROG_SCREEN; //!@todo validate CHANNELS_IN_PROG_SCREEN usage (may be one less)
-    for(unsigned int nChannel = g_nProgScreenFirst; nChannel < g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN; ++ nChannel)
-    {
-        if(nChannel > 15)
-            return;
-        showProgram(nChannel);
-    }
-}
-
-//  Save config and safely power off device
-void showPoweroffScreen()
-{
-    g_pScreen->Clear(DARK_BLUE);
-    g_pScreen->DrawRect(0,100, 40, 127, WHITE, 1, OLIVE);
-    g_pScreen->DrawRect(120,100, 159, 127, WHITE, 1, OLIVE);
-    g_pScreen->DrawText("Power off?", 38, 58);
-    g_pScreen->DrawText("NO", 8, 120, WHITE);
-    g_pScreen->DrawText("YES", 125, 120, WHITE);
-}
-
 /** Display the requested screen
-    @param nScreen ID of screen to display
+    @param pScreen Pointer to the screen to display
 */
 void showScreen(int nScreen)
 {
-    g_nScreen = nScreen;
-    g_pScreen->Clear();
-    switch(nScreen)
-    {
-        case SCREEN_PERFORMANCE:
-            showPerformanceScreen();
-            break;
-        case SCREEN_PRESET_PROGRAM:
-            showProgramScreen();
-            break;
-        case SCREEN_EDIT:
-            g_pScreenEdit->Draw();
-            break;
-        case SCREEN_EDIT_PRESET:
-            g_pScreenEditPreset->Draw();
-            break;
-        case SCREEN_BLANK:
-            return;
-        case SCREEN_LOGO:
-            g_pScreen->DrawBitmap("logo", 0, 0);
-            break;
-        case SCREEN_POWEROFF:
-            showPoweroffScreen();
-    }
+    auto it = g_mapScreens.find(nScreen);
+    if(it == g_mapScreens.end())
+        return;
+    it->second->Draw();
+    it->second->SetPreviousScreen(g_nCurrentScreen);
+    g_nCurrentScreen = nScreen;
 }
 
 /** Handle MIDI events */
@@ -627,203 +568,41 @@ bool selectPreset(unsigned int nPreset)
 /** Handle navigation buttons
     @param nButton Index of button pressed
 */
-void onNavigation(unsigned int nButton)
+void onNavigate(unsigned int nButton)
 {
-    unsigned int nScreen = g_nScreen;
-    switch(g_nScreen)
+    switch(g_nCurrentScreen)
     {
         case SCREEN_LOGO:
         case SCREEN_BLANK:
             showScreen(SCREEN_PERFORMANCE);
             break;
-        case SCREEN_PERFORMANCE:
-            switch(nButton)
-            {
-                case BUTTON_DOWN:
-                    if(g_nCurrentPreset == 0)
-                        return;
-                    selectPreset(--g_nCurrentPreset);
-                    showScreen(SCREEN_PERFORMANCE);
-                    break;
-                case BUTTON_UP:
-                    if(g_nCurrentPreset >= MAX_PRESETS - 1)
-                        return;
-                    selectPreset(++g_nCurrentPreset);
-                    showScreen(SCREEN_PERFORMANCE);
-                    break;
-                case BUTTON_RIGHT:
-                    showScreen(SCREEN_EDIT);
-                    break;
-                case BUTTON_LEFT:
-                    break;
-            }
-            break;
-        case SCREEN_EDIT:
-            switch(nButton)
-            {
-                case BUTTON_UP:
-                    g_pScreenEdit->Previous();
-                    g_pScreenEdit->Draw();
-                    break;
-                case BUTTON_DOWN:
-                    g_pScreenEdit->Next();
-                    g_pScreenEdit->Draw();
-                    break;
-                case BUTTON_RIGHT:
-                    g_pScreenEdit->Select();
-                    break;
-                case BUTTON_LEFT:
-                    showScreen(SCREEN_PERFORMANCE);
-                    break;
-            }
-            break;
-        case SCREEN_POWEROFF:
-            switch(nButton)
-            {
-                case BUTTON_RIGHT:
-                    powerOff();
-                    break;
-                case BUTTON_LEFT:
-                    showScreen(SCREEN_PERFORMANCE);
-                    break;
-            }
-        case SCREEN_EDIT_PRESET:
-            switch(nButton)
-            {
-                case BUTTON_UP:
-                    g_pScreenEditPreset->Previous();
-                    g_pScreenEditPreset->Draw();
-                    break;
-                case BUTTON_DOWN:
-                    g_pScreenEditPreset->Next();
-                    g_pScreenEditPreset->Draw();
-                    break;
-                case BUTTON_RIGHT:
-                    g_pScreenEditPreset->Select();
-                    break;
-                case BUTTON_LEFT:
-                    showScreen(SCREEN_EDIT);
-                    break;
-            }
-            break;
-        case SCREEN_PRESET_NAME:
-            switch(nButton)
-            {
-                case BUTTON_UP:
-                    break;
-                case BUTTON_DOWN:
-                    break;
-                case BUTTON_RIGHT:
-                    break;
-                case BUTTON_LEFT:
-                    break;
-            }
-            break;
-        SCREEN_PRESET_SF:
-            switch(nButton)
-            {
-                case BUTTON_UP:
-                    break;
-                case BUTTON_DOWN:
-                    break;
-                case BUTTON_RIGHT:
-                    break;
-                case BUTTON_LEFT:
-                    break;
-            }
-            break;
-        case SCREEN_PRESET_PROGRAM:
-            switch(nButton)
-            {
-                case BUTTON_UP:
-                    if(g_nSelectedChannel == 0)
-                        return;
-                    --g_nSelectedChannel;
-                    showScreen(SCREEN_PRESET_PROGRAM);
-                    break;
-                case BUTTON_DOWN:
-                    if(g_nSelectedChannel > 14)
-                        return;
-                    ++g_nSelectedChannel;
-                    showScreen(SCREEN_PRESET_PROGRAM);
-                    break;
-                case BUTTON_LEFT:
-                    showScreen(SCREEN_EDIT_PRESET);
-                    break;
-                case BUTTON_RIGHT:
-                    showScreen(SCREEN_EDIT_PRESET);
-                    break;
-            }
-        case SCREEN_EFFECTS:
-            switch(nButton)
-            { //!@todo handle value changes
-                case BUTTON_UP:
-                    if(g_nListSelection)
-                    {
-                        --g_nListSelection;
-                        showScreen(SCREEN_EFFECTS);
-                    }
-                    break;
-                case BUTTON_DOWN:
-                    if(g_nListSelection >= EFFECTS_EOL)
-                        return;
-                    ++g_nListSelection;
-                    showScreen(SCREEN_EFFECTS);
-                    break;
-                case BUTTON_RIGHT:
-                    break;
-                case BUTTON_LEFT:
-                    break;
-            }
-            break;
-        case SCREEN_MIXER:
-            switch(nButton)
-            {
-                case BUTTON_UP:
-                    break;
-                case BUTTON_DOWN:
-                    break;
-                case BUTTON_RIGHT:
-                    break;
-                case BUTTON_LEFT:
-                    break;
-            }
-            break;
-        case SCREEN_SAVE:
-            switch(nButton)
-            {
-                case BUTTON_UP:
-                    break;
-                case BUTTON_DOWN:
-                    break;
-                case BUTTON_RIGHT:
-                    break;
-                case BUTTON_LEFT:
-                    break;
-            }
-            break;
         default:
             switch(nButton)
             {
                 case BUTTON_UP:
+                    g_mapScreens[g_nCurrentScreen]->Previous();
                     break;
                 case BUTTON_DOWN:
+                    g_mapScreens[g_nCurrentScreen]->Next();
                     break;
                 case BUTTON_RIGHT:
+                    g_mapScreens[g_nCurrentScreen]->Select();
                     break;
                 case BUTTON_LEFT:
+                    showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
                     break;
             }
-            break;
     }
+    if(g_nCurrentScreen == SCREEN_PERFORMANCE)
+        selectPreset(g_mapScreens[SCREEN_PERFORMANCE]->GetSelection());
 }
 
 void onLeftHold(unsigned int nGpio)
 {
-    switch(g_nScreen)
+    switch(g_nCurrentScreen)
     {
         case SCREEN_PERFORMANCE:
-            showScreen(SCREEN_POWEROFF);
+            showScreen(SCREEN_POWER);
             break;
         default:
             showScreen(SCREEN_PERFORMANCE);
@@ -832,12 +611,12 @@ void onLeftHold(unsigned int nGpio)
 
 void onRightHold(unsigned int nGpio)
 {
-    switch(g_nScreen)
+    switch(g_nCurrentScreen)
     {
         case SCREEN_PRESET_NAME:
             showScreen(SCREEN_EDIT_PRESET);
             break;
-        case default:
+        default:
             panic();
     }
 }
@@ -849,7 +628,7 @@ void onSignal(int nSignal)
     {
     	case SIGALRM:
     	    // We use alarm to drop back to performance screen after idle delay
-            if(g_nScreen == SCREEN_LOGO)
+            if(g_nCurrentScreen == SCREEN_LOGO)
                 showScreen(SCREEN_PERFORMANCE);
             break;
     	case SIGINT:
@@ -867,7 +646,12 @@ int main(int argc, char** argv)
     printf("riban fluidbox\n");
     g_pScreen = new ribanfblib("/dev/fb1");
     g_pScreen->LoadBitmap("logo.bmp", "logo");
-    showScreen(SCREEN_LOGO); // Show logo at start up - will go to performance screen after idle delay or button press
+    g_pScreen->DrawBitmap("logo", 0, 0);
+    g_nCurrentScreen = SCREEN_LOGO;
+    
+    system("gpio mode 26 pwm");
+    system("gpio pwm 26 900");
+
     loadConfig();
 
     // Create and populate fluidsynth settings
@@ -913,10 +697,10 @@ int main(int argc, char** argv)
     // Configure buttons
     wiringPiSetupGpio();
     ButtonHandler buttonHandler;
-    buttonHandler.AddButton(BUTTON_UP, onNavigation);
-    buttonHandler.AddButton(BUTTON_DOWN, onNavigation);
-    buttonHandler.AddButton(BUTTON_LEFT, onNavigation, NULL, onLeftHold);
-    buttonHandler.AddButton(BUTTON_RIGHT, NULL, onNavigation, onRightHold);
+    buttonHandler.AddButton(BUTTON_UP, onNavigate);
+    buttonHandler.AddButton(BUTTON_DOWN, onNavigate);
+    buttonHandler.AddButton(BUTTON_LEFT, onNavigate, NULL, onLeftHold);
+    buttonHandler.AddButton(BUTTON_RIGHT, NULL, onNavigate, onRightHold);
     buttonHandler.SetRepeatPeriod(BUTTON_UP, 100);
     buttonHandler.SetRepeatPeriod(BUTTON_DOWN, 100);
 
@@ -925,18 +709,44 @@ int main(int argc, char** argv)
     signal(SIGINT, onSignal);
     signal(SIGTERM, onSignal);
 
-    g_pScreenEdit = new ListScreen(g_pScreen, "Edit");
-    g_pScreenEdit->Add("Mixer", showScreen, SCREEN_MIXER);
-    g_pScreenEdit->Add("Effects", showScreen, SCREEN_EFFECTS);
-    g_pScreenEdit->Add("Edit preset", showScreen, SCREEN_EDIT_PRESET);
-    g_pScreenEdit->Add("Manage soundfonts", showScreen, SCREEN_SOUNDFONT);
-    g_pScreenEdit->Add("Update", showScreen, SCREEN_UPDATE);
-    g_pScreenEdit->Add("Reboot", showScreen, SCREEN_REBOOT);
+    g_mapScreens[SCREEN_PERFORMANCE] = new ListScreen(g_pScreen, "Fluidbox 20.01.01", SCREEN_PERFORMANCE);
+    g_mapScreens[SCREEN_EDIT_PRESET] = new ListScreen(g_pScreen, "Edit Preset", SCREEN_EDIT);
+    g_mapScreens[SCREEN_EDIT] = new ListScreen(g_pScreen, "Edit", SCREEN_PERFORMANCE);
+    g_mapScreens[SCREEN_POWER] = new ListScreen(g_pScreen, "Power", SCREEN_PERFORMANCE);
+    g_mapScreens[SCREEN_PRESET_NAME] = new ListScreen(g_pScreen, "Preset Name", SCREEN_EDIT_PRESET);
+    g_mapScreens[SCREEN_PRESET_SF] = new ListScreen(g_pScreen, "Preset Soundfont", SCREEN_EDIT_PRESET);
+    g_mapScreens[SCREEN_PRESET_PROGRAM] = new ListScreen(g_pScreen,  "Preset Program", SCREEN_EDIT_PRESET);
+    g_mapScreens[SCREEN_EFFECTS] = new ListEditScreen(g_pScreen, "Effects", SCREEN_EDIT);
+    g_mapScreens[SCREEN_MIXER] = new ListScreen(g_pScreen,  "Mixer", SCREEN_EDIT);
+    g_mapScreens[SCREEN_SAVE] = new ListScreen(g_pScreen, "Save", SCREEN_EDIT);
+    g_mapScreens[SCREEN_UPDATE] = new ListScreen(g_pScreen, "Update", SCREEN_EDIT);
+    g_mapScreens[SCREEN_SOUNDFONT] = new ListScreen(g_pScreen, "Soundfont", SCREEN_EDIT);
 
-    g_pScreenEditPreset = new ListScreen(g_pScreen, "Edit Preset");
-    g_pScreenEditPreset->Add("Name", showScreen, SCREEN_PRESET_NAME);
-    g_pScreenEditPreset->Add("Soundfont", showScreen, SCREEN_PRESET_SF);
-    g_pScreenEditPreset->Add("Program", showScreen, SCREEN_PRESET_PROGRAM);
+    for(unsigned int nPreset=0; nPreset < MAX_PRESETS; ++nPreset)
+        g_mapScreens[SCREEN_PERFORMANCE]->Add(g_presets[nPreset].name, showScreen, SCREEN_EDIT);
+
+    g_mapScreens[SCREEN_EDIT]->Add("Mixer", showScreen, SCREEN_MIXER);
+    g_mapScreens[SCREEN_EDIT]->Add("Effects", showScreen, SCREEN_EFFECTS);
+    g_mapScreens[SCREEN_EDIT]->Add("Edit preset", showScreen, SCREEN_EDIT_PRESET);
+    g_mapScreens[SCREEN_EDIT]->Add("Manage soundfonts", showScreen, SCREEN_SOUNDFONT);
+    g_mapScreens[SCREEN_EDIT]->Add("Update", showScreen, SCREEN_UPDATE);
+    g_mapScreens[SCREEN_EDIT]->Add("Power", showScreen, SCREEN_POWER);
+
+    g_mapScreens[SCREEN_EDIT_PRESET]->Add("Name", showScreen, SCREEN_PRESET_NAME);
+    g_mapScreens[SCREEN_EDIT_PRESET]->Add("Soundfont", showScreen, SCREEN_PRESET_SF);
+    g_mapScreens[SCREEN_EDIT_PRESET]->Add("Program", showScreen, SCREEN_PRESET_PROGRAM);
+
+    g_mapScreens[SCREEN_POWER]->Add("Save and power off", power, POWER_OFF_SAVE);
+    g_mapScreens[SCREEN_POWER]->Add("Save and reboot", power, POWER_REBOOT_SAVE);
+    g_mapScreens[SCREEN_POWER]->Add("Power off", power, POWER_OFF);
+    g_mapScreens[SCREEN_POWER]->Add("Reboot",  power, POWER_REBOOT);
+
+    g_mapScreens[SCREEN_EFFECTS]->Add("Reverb enable", editReverb, REVERB_ENABLE);
+    g_mapScreens[SCREEN_EFFECTS]->Add("Reverb room size", editReverb, REVERB_ROOMSIZE);
+    g_mapScreens[SCREEN_EFFECTS]->Add("Reverb damping", editReverb, REVERB_DAMPING);
+    g_mapScreens[SCREEN_EFFECTS]->Add("Reverb width", editReverb, REVERB_WIDTH);
+    g_mapScreens[SCREEN_EFFECTS]->Add("Reverb level", editReverb, REVERB_LEVEL);
+
 
     // Show splash screen for a while (idle delay)
     alarm(2);
@@ -960,9 +770,8 @@ int main(int argc, char** argv)
     delete_fluid_synth(g_pSynth);
     delete_fluid_settings(pSettings);
     g_pScreen->Clear();
-    delete g_pScreen;
-    delete g_pScreenEdit;
-    delete g_pScreenEditPreset;
+    for(auto it = g_mapScreens.begin(); it!= g_mapScreens.end(); ++it)
+        delete it->second;
     return 0;
 }
 

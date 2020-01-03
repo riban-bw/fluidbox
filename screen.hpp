@@ -55,6 +55,17 @@ class ListScreen
 		return m_nSelection;
 	}
 
+	void SetSelection(int nSelection)
+	{
+		if(nSelection < m_vEntries.size())
+			m_nSelection = nSelection;
+	}
+
+	int GetFirstShown()
+	{
+		return m_nFirstEntry;
+	}
+
 	/**	Display the screen */
 	virtual void Draw() 
 	{
@@ -89,6 +100,13 @@ class ListScreen
         if(m_nSelection < 1)
             m_nSelection = 0;
     };
+
+    void ClearList()
+    {
+        for(auto it = m_vEntries.begin(); it != m_vEntries.end(); ++it)
+            delete *it;
+        m_vEntries.clear();
+    }
 
     void Select()
     {

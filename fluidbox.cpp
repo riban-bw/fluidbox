@@ -17,11 +17,10 @@
 #define CHANNELS_IN_PROG_SCREEN 6
 
 // Define GPIO pin usage (note some are not used by code but useful for planning
-#define BUTTON_POWER   3
 #define BUTTON_UP      4
 #define BUTTON_DOWN   17
 #define BUTTON_LEFT   27
-#define BUTTON_RIGHT  22
+#define BUTTON_RIGHT   3
 #define BUTTON_PANIC  23
 #define SPI_CE1        7
 #define DISPLAY_CS     8
@@ -47,7 +46,6 @@ enum {
 	SCREEN_PRESET_PROGRAM,
 	SCREEN_EFFECTS,
         SCREEN_MIXER,
-	SCREEN_SAVE,
 	SCREEN_UPDATE,
 	SCREEN_SOUNDFONT,
 	SCREEN_REBOOT,
@@ -110,6 +108,8 @@ struct Preset {
     bool dirty = false;
 };
 
+void showScreen(int nScreen);
+
 fluid_synth_t* g_pSynth; // Pointer to the synth object
 ribanfblib* g_pScreen; // Pointer to the screen object
 int g_nCurrentSoundfont = FLUID_FAILED; // ID of currently loaded soundfont
@@ -119,7 +119,6 @@ map<unsigned int,Preset*> g_mapPresets; // Map of presets indexed by id
 //Preset g_presets[MAX_PRESETS]; // Preset configurations
 unsigned int g_nCurrentPreset = 1; // Index of the selected preset
 unsigned int g_nSelectedChannel = 0; // Index of the selected (highlighted) program
-unsigned int g_nProgScreenFirst = 0; // Channel at top of program screen
 unsigned int g_nListSelection = 0; // Currently highlighted entry in a list
 unsigned char debouncePin[32]; // Debounce streams for each GPIO pin
 
@@ -175,6 +174,15 @@ int validateInt(string sValue, int min, int max)
     return nValue;
 }
 
+/** Convert string to lowercase */
+string toLower(string sString)
+{
+    string sReturn;
+    for(size_t i=0; i<sString.length(); ++i)
+        sReturn += tolower(sString[i]);
+    return sReturn;
+}
+
 /** PANIC
     param nMode Panic mode [PANIC_NOTES | PANIC_SOUNDS | PANIC_RESET]
     param nChannel MIDI channel to reset [0-15, 16=ALL]
@@ -201,6 +209,7 @@ void panic(int nMode=PANIC_NOTES, int nChannel=16)
         }
     }
 }
+
 
 /** Save persistent data to configuration file */
 bool saveConfig(string sFilename = "./fb.config")
@@ -289,31 +298,29 @@ void editReverb(unsigned int nParam)
     }
 }
 
-/** Updates the display of a program for the specified channel
-    @param nChannel MIDI channel to display
-*/
-void showProgram(unsigned int nChannel)
+/**  Shows the edit program screen */
+void showEditProgram(unsigned int=0)
 {
-    if(g_nCurrentScreen != SCREEN_PRESET_PROGRAM || nChannel < g_nProgScreenFirst || nChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
-        return;
-
+    g_mapScreens[SCREEN_PRESET_PROGRAM]->ClearList();
     int nSfId, nBank, nProgram;
-    fluid_synth_get_program(g_pSynth, nChannel, &nSfId, &nBank, &nProgram);
-    fluid_sfont_t* pSoundfont = fluid_synth_get_sfont_by_id(g_pSynth, nSfId);
-    if(pSoundfont)
+    char sPrefix[6];
+    for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
     {
-        fluid_preset_t* pPreset = fluid_sfont_get_preset(pSoundfont, nBank, nProgram);
-        if(pPreset)
+        fluid_synth_get_program(g_pSynth, nChannel, &nSfId, &nBank, &nProgram);
+        fluid_sfont_t* pSoundfont = fluid_synth_get_sfont_by_id(g_pSynth, nSfId);
+        if(pSoundfont)
         {
-            char sPrefix[6];
-            sprintf(sPrefix, "%02d: ", nChannel);
-            string sPreset = (char*)sPrefix;
-            sPreset += fluid_preset_get_name(pPreset);
-            int nY = 32 + (nChannel - g_nProgScreenFirst) * 16;
-            g_pScreen->DrawRect(0,nY, 160,nY+15, BLACK, 0, (g_nSelectedChannel == nChannel)?BLUE:BLACK);
-            g_pScreen->DrawText(sPreset.c_str(), 2, 15+nY, WHITE);
+            fluid_preset_t* pPreset = fluid_sfont_get_preset(pSoundfont, nBank, nProgram);
+            if(pPreset)
+            {
+                sprintf(sPrefix, "%02d: ", nChannel+1);
+                string sName = (char*)sPrefix;
+                sName += fluid_preset_get_name(pPreset);
+                g_mapScreens[SCREEN_PRESET_PROGRAM]->Add(sName);
+            }
         }
     }
+    showScreen(SCREEN_PRESET_PROGRAM);
 }
 
 /**     Update the MIDI note on indicator on the program screens showing quantity of on notes (max 15)
@@ -321,13 +328,13 @@ void showProgram(unsigned int nChannel)
 */
 void showMidiActivity(int nChannel)
 {
-    if(g_nCurrentScreen != SCREEN_PRESET_PROGRAM || nChannel < g_nProgScreenFirst || nChannel > g_nProgScreenFirst + CHANNELS_IN_PROG_SCREEN)
+    if(g_nCurrentScreen != SCREEN_PRESET_PROGRAM || nChannel < g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown() || nChannel > g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown() + 6)
         return;
-    int nY = 32 + (nChannel - g_nProgScreenFirst) * 16; //Upper left corner of channel indicator
-    g_pScreen->DrawRect(0,nY, 2,nY+15, BLACK, 0, BLACK); // Clear the indicator
+    int nY = 16 + (nChannel - g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown()) * 16; //Upper left corner of channel indicator
+    g_pScreen->DrawRect(158,nY, 159,nY+15, BLACK, 0, BLACK); // Clear the indicator
     int nCount = (g_nNoteCount[nChannel] < 16)?g_nNoteCount[nChannel]:15; // Limit max note indication to 15
     if(nCount)
-        g_pScreen->DrawRect(0,nY+15, 2,nY+15-nCount, RED, 0, RED); // Draw indicator
+        g_pScreen->DrawRect(158,nY+15, 159,nY+15-nCount, RED, 0, RED); // Draw indicator
 }
 
 /** Display the requested screen
@@ -341,6 +348,12 @@ void showScreen(int nScreen)
     it->second->Draw();
     it->second->SetPreviousScreen(g_nCurrentScreen);
     g_nCurrentScreen = nScreen;
+}
+
+void save(int)
+{
+    saveConfig();
+    showScreen(SCREEN_PERFORMANCE);
 }
 
 void newPreset(unsigned int)
@@ -365,7 +378,8 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
             sKey += to_string(nChannel);
             g_mapPresets[g_nCurrentPreset]->program[nChannel].program = nProgram;
             g_mapPresets[g_nCurrentPreset]->dirty = true;
-            showProgram(nChannel);
+            if(g_nCurrentScreen == SCREEN_PRESET_PROGRAM)
+                showEditProgram();
             break;
         }
         case 0x80: // Note off
@@ -383,14 +397,6 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
     return 0;
 }
 
-/** Convert string to lowercase */
-string toLower(string sString)
-{
-    string sReturn;
-    for(size_t i=0; i<sString.length(); ++i)
-        sReturn += tolower(sString[i]);
-    return sReturn;
-}
 
 /** Load configuration from file */
 bool loadConfig(string sFilename = "./fb.config")
@@ -703,9 +709,6 @@ int main(int argc, char** argv)
     else
         cerr << "Failed to create audio driver" << endl;
 
-    // Select preset
-    selectPreset(g_nCurrentPreset);
-
     // Configure buttons
     wiringPiSetupGpio();
     ButtonHandler buttonHandler;
@@ -730,7 +733,6 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_PRESET_PROGRAM] = new ListScreen(g_pScreen,  "Preset Program", SCREEN_EDIT_PRESET);
     g_mapScreens[SCREEN_EFFECTS] = new ListEditScreen(g_pScreen, "Effects", SCREEN_EDIT);
     g_mapScreens[SCREEN_MIXER] = new ListScreen(g_pScreen,  "Mixer", SCREEN_EDIT);
-    g_mapScreens[SCREEN_SAVE] = new ListScreen(g_pScreen, "Save", SCREEN_EDIT);
     g_mapScreens[SCREEN_UPDATE] = new ListScreen(g_pScreen, "Update", SCREEN_EDIT);
     g_mapScreens[SCREEN_SOUNDFONT] = new ListScreen(g_pScreen, "Soundfont", SCREEN_EDIT);
 
@@ -742,12 +744,13 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_EDIT]->Add("Edit preset", showScreen, SCREEN_EDIT_PRESET);
     g_mapScreens[SCREEN_EDIT]->Add("New preset", newPreset);
     g_mapScreens[SCREEN_EDIT]->Add("Manage soundfonts", showScreen, SCREEN_SOUNDFONT);
-    g_mapScreens[SCREEN_EDIT]->Add("Update", showScreen, SCREEN_UPDATE);
+    g_mapScreens[SCREEN_EDIT]->Add("Save", save);
     g_mapScreens[SCREEN_EDIT]->Add("Power", showScreen, SCREEN_POWER);
+    g_mapScreens[SCREEN_EDIT]->Add("Update", showScreen, SCREEN_UPDATE);
 
     g_mapScreens[SCREEN_EDIT_PRESET]->Add("Name", showScreen, SCREEN_PRESET_NAME);
     g_mapScreens[SCREEN_EDIT_PRESET]->Add("Soundfont", showScreen, SCREEN_PRESET_SF);
-    g_mapScreens[SCREEN_EDIT_PRESET]->Add("Program", showScreen, SCREEN_PRESET_PROGRAM);
+    g_mapScreens[SCREEN_EDIT_PRESET]->Add("Program", showEditProgram);
 
     g_mapScreens[SCREEN_POWER]->Add("Save and power off", power, POWER_OFF_SAVE);
     g_mapScreens[SCREEN_POWER]->Add("Save and reboot", power, POWER_REBOOT_SAVE);
@@ -760,6 +763,10 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_EFFECTS]->Add("Reverb width", editReverb, REVERB_WIDTH);
     g_mapScreens[SCREEN_EFFECTS]->Add("Reverb level", editReverb, REVERB_LEVEL);
 
+
+    // Select preset
+    selectPreset(g_nCurrentPreset);
+    g_mapScreens[SCREEN_PERFORMANCE]->SetSelection(g_nCurrentPreset);
 
     // Show splash screen for a while (idle delay)
     alarm(2);

@@ -1,6 +1,7 @@
 #include "fluidsynth.h"
 #include "buttonhandler.hpp"
 #include "ribanfblib/ribanfblib.h"
+#include "screen.hpp"
 #include <wiringPi.h>
 #include <cstdio> //provides printf
 #include <iostream> //provides streams
@@ -113,11 +114,11 @@ struct Preset {
     Program program[16];
     Reverb reverb;
     Chorus chorus;
+    bool dirty = false;
 };
 
 fluid_synth_t* g_pSynth; // Pointer to the synth object
 ribanfblib* g_pScreen; // Pointer to the screen object
-bool g_bPresetDirty = false; // True if preset 0 has been modified
 int g_nCurrentSoundfont = FLUID_FAILED; // ID of currently loaded soundfont
 int g_nScreen = SCREEN_LOGO; // ID of currently displayed screen - maybe should be derived from state model
 int g_nRunState = 1; // Current run state [1=running, 0=closing]
@@ -129,75 +130,9 @@ unsigned int g_nProgScreenFirst = 0; // Channel at top of program screen
 unsigned int g_nListSelection = 0; // Currently highlighted entry in a list
 unsigned char debouncePin[32]; // Debounce streams for each GPIO pin
 
-// An entry in a list screen
-struct ListEntry {
-    string title; // Title to display in list
-    unsigned int screen = SCREEN_EOL; // Index of screen to navigate to on selection - default is none
-    std::function<void(void)> function = NULL;  // Function to call on selection - default is none - function template: void function(void)
-};
+ListScreen* g_pScreenEdit;
+ListScreen* g_pScreenEditPreset;
 
-// Screen containing a list
-struct ListScreen
-{
-    string title;
-    unsigned int nSelection = -1; // Index of selected item
-    std::vector<ListEntry*> vEntries; // List of entries
-    unsigned int nFirstEntry = 0; // Index of first item to display
-    bool initiated = false;
-    void draw()
-    {
-        g_pScreen->Clear();
-        // Draw title
-        g_pScreen->DrawRect(0,0, 160,16, BLUE, 0, BLUE);
-        g_pScreen->DrawText(title, 0, 15, WHITE);
-        int nY = 1 + nSelection - nFirstEntry) * 16;
-        // Draw highlight
-        if(nSelection > -1)
-        {
-            g_pScreen->DrawRect(0,nY, 160,nY+15, BLUE, 0, BLUE);
-        }
-        // Draw entries
-        for(unsigned int nRow = 0; nRow < 7; ++nRow)
-        {
-            if(nRow + nFirstEntry > vEntries.size() - 1)
-                return; // Reached end of list
-            g_pScreen->DrawText(vEntries[nRow + nFirstEntry]->title, 2, 15+nY, WHITE);
-        }
-    };
-    void add(string title, unsigned int screen, std::function<void(void)> function = NULL)
-    {
-        ListEntry* pEntry = new ListEntry;
-        pEntry->title = title;
-        pEntry->screen = screen;
-        pEntry->function = function;
-        vEntries.push_back(pEntry);
-    };
-    void highlight(unsigned int id)
-    {
-        if(nSelection < vEntries.size())
-            nSelection = id;;
-    };
-    void select(unsigned int id)
-    {
-        if(nSelection < vEntries.size())
-        {
-            if(vEntries[nSelection]->function)
-                vEntries[nSelection]->function();
-            else
-                showScreen(vEntries[nSelection]->screen);
-        }
-    };
-    void next()
-    {
-        if(nSelection < vEntries.size() - 1)
-            ++nSelection;
-    };
-    void previous()
-    {
-        if(nSelection > 0)
-            --nSelection;
-    };
-};
 
 /**     Return a converted and vaildated value
 *       @param sValue Value as a string
@@ -391,14 +326,14 @@ void showPerformanceScreen()
     g_pScreen->DrawRect(0,0, 160,16, BLUE, 0, BLUE); //!@todo Use header colour to distinguish screens?
     string sTitle = "riban fluidbox 0.1";
     g_pScreen->DrawText(sTitle, 0, 15);
+    Preset* pPreset = &g_presets[g_nCurrentPreset];
     string sPreset;
-    if(g_bPresetDirty)
+    if(pPreset->dirty)
         sPreset = "*";
     else
         sPreset = " ";
-    sPreset += g_presets[0].name;
+    sPreset += pPreset->name;
     g_pScreen->DrawText(sPreset, 0, 50);
-    //!@todo Improve performance screen
 }
 
 /** Display list of programs for each channel in the currently selected preset
@@ -424,30 +359,15 @@ void showProgramScreen()
     }
 }
 
-/**  Display edit options (utility menu) */
-void showEditScreen()
-{
-    static ListScreen listscreen;
-    if(!listscreen.initiated)
-    {
-        listscreen.title = "Edit";
-        listscreen.add("Mixer", SCREEN_MIXER);
-        listscreen.add("Effects", SCREEN_EFFECTS);
-        listscreen.add("Edit preset", SCREEN_EDIT_PRESET);
-        listscreen.add("Manage soundfonts", SCREEN_SOUNDFONT);
-        listscreen.add("Update", SCREEN_UPDATE);
-        listscreen.add("Reboot", SCREEN_REBOOT);
-        listscreen.initiated = true;
-    }
-    listscreen.draw();
-}
-
 //  Save config and safely power off device
 void showPoweroffScreen()
 {
-    g_pScreen->Clear(BLUE);
-    g_pScreen->DrawText("Power off?", 10, 30);
-    g_pScreen->DrawText("<-NO    YES->", 10,50);
+    g_pScreen->Clear(DARK_BLUE);
+    g_pScreen->DrawRect(0,100, 40, 127, WHITE, 1, OLIVE);
+    g_pScreen->DrawRect(120,100, 159, 127, WHITE, 1, OLIVE);
+    g_pScreen->DrawText("Power off?", 38, 58);
+    g_pScreen->DrawText("NO", 8, 120, WHITE);
+    g_pScreen->DrawText("YES", 125, 120, WHITE);
 }
 
 /** Display the requested screen
@@ -466,7 +386,10 @@ void showScreen(int nScreen)
             showProgramScreen();
             break;
         case SCREEN_EDIT:
-            showEditScreen();
+            g_pScreenEdit->Draw();
+            break;
+        case SCREEN_EDIT_PRESET:
+            g_pScreenEditPreset->Draw();
             break;
         case SCREEN_BLANK:
             return;
@@ -492,7 +415,7 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
             string sKey = "midi.program_";
             sKey += to_string(nChannel);
             g_presets[0].program[nChannel].program = nProgram;
-            g_bPresetDirty = true;
+            g_presets[0].dirty = true;
             showProgram(nChannel);
             break;
         }
@@ -638,7 +561,7 @@ bool loadSoundfont(string sFilename)
     if(g_nCurrentSoundfont >= 0)
     {
         g_presets[0].soundfont = sFilename;
-        g_bPresetDirty = true;
+        g_presets[0].dirty = true;
     }
     return (g_nCurrentSoundfont >= 0);
 }
@@ -723,13 +646,12 @@ void onNavigation(unsigned int nButton)
                     showScreen(SCREEN_PERFORMANCE);
                     break;
                 case BUTTON_UP:
-                    if(g_nCurrentPreset > MAX_PRESETS -1)
+                    if(g_nCurrentPreset >= MAX_PRESETS - 1)
                         return;
                     selectPreset(++g_nCurrentPreset);
                     showScreen(SCREEN_PERFORMANCE);
                     break;
                 case BUTTON_RIGHT:
-                    g_nListSelection = 0; //!@todo Can we re-enter screen at same point? Will it interfer with other lists?
                     showScreen(SCREEN_EDIT);
                     break;
                 case BUTTON_LEFT:
@@ -740,39 +662,15 @@ void onNavigation(unsigned int nButton)
             switch(nButton)
             {
                 case BUTTON_UP:
-                    if(g_nListSelection == 0)
-                        return;
-                    --g_nListSelection;
-                    showScreen(SCREEN_EDIT);
+                    g_pScreenEdit->Previous();
+                    g_pScreenEdit->Draw();
                     break;
                 case BUTTON_DOWN:
-                    if(g_nListSelection >= EDIT_EOL)
-                        return;
-                    ++g_nListSelection;
-                    showScreen(SCREEN_EDIT);
+                    g_pScreenEdit->Next();
+                    g_pScreenEdit->Draw();
                     break;
                 case BUTTON_RIGHT:
-                    switch(g_nListSelection)
-                    {
-                        case EDIT_MIXER:
-                            showScreen(SCREEN_MIXER);
-                            break;
-                        case EDIT_EFFECTS:
-                            showScreen(SCREEN_EFFECTS);
-                            break;
-                        case EDIT_PRESET:
-                            showScreen(SCREEN_EDIT_PRESET);
-                            break;
-                        case EDIT_SOUNDFONT:
-                            showScreen(SCREEN_SOUNDFONT);
-                            break;
-                        case EDIT_UPDATE:
-                            showScreen(SCREEN_UPDATE);
-                            break;
-                        case EDIT_REBOOT:
-                            reboot();
-                            break;
-                    }
+                    g_pScreenEdit->Select();
                     break;
                 case BUTTON_LEFT:
                     showScreen(SCREEN_PERFORMANCE);
@@ -793,34 +691,18 @@ void onNavigation(unsigned int nButton)
             switch(nButton)
             {
                 case BUTTON_UP:
-                    if(g_nListSelection)
-                    {
-                        --g_nListSelection;
-                        showScreen(SCREEN_EDIT_PRESET);
-                    }
+                    g_pScreenEditPreset->Previous();
+                    g_pScreenEditPreset->Draw();
                     break;
                 case BUTTON_DOWN:
-                    if(g_nListSelection < EDIT_PRESET_EOL)
-                    {
-                        ++g_nListSelection;
-                        showScreen(SCREEN_EDIT_PRESET);
-                    }
+                    g_pScreenEditPreset->Next();
+                    g_pScreenEditPreset->Draw();
                     break;
                 case BUTTON_RIGHT:
-                    switch(g_nListSelection)
-                    {
-                        case EDIT_PRESET_NAME:
-                            showScreen(SCREEN_PRESET_NAME);
-                            break;
-                        case EDIT_PRESET_SF:
-                            showScreen(SCREEN_PRESET_SF);
-                            break;
-                        case EDIT_PRESET_PROGRAM:
-                            showScreen(SCREEN_PRESET_PROGRAM);
-                            break;
-                    }
+                    g_pScreenEditPreset->Select();
                     break;
                 case BUTTON_LEFT:
+                    showScreen(SCREEN_EDIT);
                     break;
             }
             break;
@@ -943,6 +825,8 @@ void onLeftHold(unsigned int nGpio)
         case SCREEN_PERFORMANCE:
             showScreen(SCREEN_POWEROFF);
             break;
+        default:
+            showScreen(SCREEN_PERFORMANCE);
     }
 }
 
@@ -950,9 +834,11 @@ void onRightHold(unsigned int nGpio)
 {
     switch(g_nScreen)
     {
-        case SCREEN_PERFORMANCE:
-            panic();
+        case SCREEN_PRESET_NAME:
+            showScreen(SCREEN_EDIT_PRESET);
             break;
+        case default:
+            panic();
     }
 }
 
@@ -1030,7 +916,7 @@ int main(int argc, char** argv)
     buttonHandler.AddButton(BUTTON_UP, onNavigation);
     buttonHandler.AddButton(BUTTON_DOWN, onNavigation);
     buttonHandler.AddButton(BUTTON_LEFT, onNavigation, NULL, onLeftHold);
-    buttonHandler.AddButton(BUTTON_RIGHT, onNavigation, NULL, onRightHold);
+    buttonHandler.AddButton(BUTTON_RIGHT, NULL, onNavigation, onRightHold);
     buttonHandler.SetRepeatPeriod(BUTTON_UP, 100);
     buttonHandler.SetRepeatPeriod(BUTTON_DOWN, 100);
 
@@ -1038,6 +924,19 @@ int main(int argc, char** argv)
     signal(SIGALRM, onSignal);
     signal(SIGINT, onSignal);
     signal(SIGTERM, onSignal);
+
+    g_pScreenEdit = new ListScreen(g_pScreen, "Edit");
+    g_pScreenEdit->Add("Mixer", showScreen, SCREEN_MIXER);
+    g_pScreenEdit->Add("Effects", showScreen, SCREEN_EFFECTS);
+    g_pScreenEdit->Add("Edit preset", showScreen, SCREEN_EDIT_PRESET);
+    g_pScreenEdit->Add("Manage soundfonts", showScreen, SCREEN_SOUNDFONT);
+    g_pScreenEdit->Add("Update", showScreen, SCREEN_UPDATE);
+    g_pScreenEdit->Add("Reboot", showScreen, SCREEN_REBOOT);
+
+    g_pScreenEditPreset = new ListScreen(g_pScreen, "Edit Preset");
+    g_pScreenEditPreset->Add("Name", showScreen, SCREEN_PRESET_NAME);
+    g_pScreenEditPreset->Add("Soundfont", showScreen, SCREEN_PRESET_SF);
+    g_pScreenEditPreset->Add("Program", showScreen, SCREEN_PRESET_PROGRAM);
 
     // Show splash screen for a while (idle delay)
     alarm(2);
@@ -1062,6 +961,8 @@ int main(int argc, char** argv)
     delete_fluid_settings(pSettings);
     g_pScreen->Clear();
     delete g_pScreen;
+    delete g_pScreenEdit;
+    delete g_pScreenEditPreset;
     return 0;
 }
 

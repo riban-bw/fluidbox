@@ -3,6 +3,12 @@
 
 #include "ribanfblib/ribanfblib.h"
 
+#define TITLE_BG DARK_RED
+#define TITLE_FG WHITE
+#define SELECT_BG BLUE
+#define ENTRY_FG WHITE
+
+
 using namespace std;
 
 
@@ -70,8 +76,8 @@ class ListScreen
 	virtual void Draw() 
 	{
 		m_pScreen->Clear();
-		m_pScreen->DrawRect(0,0, 160,16, BLUE, 0, BLUE);
-		m_pScreen->DrawText(m_sTitle, 5, 15, WHITE);
+		m_pScreen->DrawRect(0,0, 160,16, TITLE_BG, 0, TITLE_BG);
+		m_pScreen->DrawText(m_sTitle, 5, 14, TITLE_FG);
 		if(!m_vEntries.size())
 			return;
 
@@ -79,14 +85,14 @@ class ListScreen
 	        // Draw highlight
         	if(m_nSelection > -1)
         	{
-         	   	m_pScreen->DrawRect(0,nY, 160,nY+15, BLUE, 0, BLUE);
+         	   	m_pScreen->DrawRect(0,nY, 160,nY+15, SELECT_BG, 0, SELECT_BG);
         	}
         	// Draw entries
         	for(unsigned int nRow = 0; nRow < 7; ++nRow)
         	{
            	 	if(nRow + m_nFirstEntry > m_vEntries.size() - 1)
                			 return; // Reached end of list
-           	 	m_pScreen->DrawText(m_vEntries[nRow + m_nFirstEntry]->title, 2, 16*(nRow+2), WHITE);
+           	 	m_pScreen->DrawText(m_vEntries[nRow + m_nFirstEntry]->title, 2, 16*(nRow+2) - 2, ENTRY_FG);
         	}
 	}
 
@@ -100,6 +106,18 @@ class ListScreen
         if(m_nSelection < 1)
             m_nSelection = 0;
     };
+
+	void Remove(unsigned int nIndex)
+	{
+		if(nIndex >= m_vEntries.size())
+			return;
+		auto it = m_vEntries.begin();
+    		for(unsigned i = 0; i < nIndex; ++i)
+		        ++it;
+		m_vEntries.erase(it);
+		if(m_nSelection >= nIndex)
+			--m_nSelection;
+	}
 
     void ClearList()
     {

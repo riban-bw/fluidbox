@@ -115,9 +115,10 @@ ribanfblib* g_pScreen; // Pointer to the screen object
 int g_nCurrentSoundfont = FLUID_FAILED; // ID of currently loaded soundfont
 int g_nRunState = 1; // Current run state [1=running, 0=closing]
 unsigned int g_nNoteCount[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // Quantity of notes playing on each MIDI channel
-map<unsigned int,Preset*> g_mapPresets; // Map of presets indexed by id
+vector<Preset*> g_vPresets; // Map of presets indexed by id
 //Preset g_presets[MAX_PRESETS]; // Preset configurations
-unsigned int g_nCurrentPreset = 1; // Index of the selected preset
+unsigned int g_nCurrentPreset = 0; // Index of the selected preset
+//!@todo Cannot handle zero presets!!!
 unsigned int g_nSelectedChannel = 0; // Index of the selected (highlighted) program
 unsigned int g_nListSelection = 0; // Currently highlighted entry in a list
 unsigned char debouncePin[32]; // Debounce streams for each GPIO pin
@@ -227,28 +228,28 @@ bool saveConfig(string sFilename = "./fb.config")
     fileConfig << "preset=" << to_string(g_nCurrentPreset) << endl;
 
     // Save presets
-    for(unsigned int nPreset = 0; nPreset < g_mapPresets.size(); ++nPreset)
+    for(unsigned int nPreset = 0; nPreset < g_vPresets.size(); ++nPreset)
     {
         fileConfig << endl << "[preset_" << nPreset << "]" << endl;
-        fileConfig << endl << "name=" << g_mapPresets[nPreset]->name << endl;
-        fileConfig << endl << "soundfont=" << g_mapPresets[nPreset]->soundfont << endl;
+        fileConfig << endl << "name=" << g_vPresets[nPreset]->name << endl;
+        fileConfig << endl << "soundfont=" << g_vPresets[nPreset]->soundfont << endl;
         for(unsigned int nProgram = 0; nProgram < 16; ++nProgram)
         {
-            fileConfig << "prog_" << nProgram << "=" << g_mapPresets[nPreset]->program[nProgram].bank << ":" << g_mapPresets[nPreset]->program[nProgram].program << endl;
-            fileConfig << "level_" << nProgram << "=" << g_mapPresets[nPreset]->program[nProgram].level << endl;
-            fileConfig << "balance_" << nProgram << "=" << g_mapPresets[nPreset]->program[nProgram].balance << endl;
+            fileConfig << "prog_" << nProgram << "=" << g_vPresets[nPreset]->program[nProgram].bank << ":" << g_vPresets[nPreset]->program[nProgram].program << endl;
+            fileConfig << "level_" << nProgram << "=" << g_vPresets[nPreset]->program[nProgram].level << endl;
+            fileConfig << "balance_" << nProgram << "=" << g_vPresets[nPreset]->program[nProgram].balance << endl;
         }
-        fileConfig << "reverb_enable=" <<  (g_mapPresets[nPreset]->reverb.enable?"1":"0") << endl;
-        fileConfig << "reverb_roomsize=" <<  g_mapPresets[nPreset]->reverb.roomsize << endl;
-        fileConfig << "reverb_damping=" <<  g_mapPresets[nPreset]->reverb.damping << endl;
-        fileConfig << "reverb_width=" <<  g_mapPresets[nPreset]->reverb.width << endl;
-        fileConfig << "reverb_level=" <<  g_mapPresets[nPreset]->reverb.level << endl;
-        fileConfig << "chorus_enable=" <<  g_mapPresets[nPreset]->chorus.enable << endl;
-        fileConfig << "chorus_voicecount=" <<  g_mapPresets[nPreset]->chorus.voicecount << endl;
-        fileConfig << "chorus_level=" <<  g_mapPresets[nPreset]->chorus.level << endl;
-        fileConfig << "chorus_speed=" <<  g_mapPresets[nPreset]->chorus.speed << endl;
-        fileConfig << "chorus_depth=" <<  g_mapPresets[nPreset]->chorus.depth << endl;
-        fileConfig << "chorus_type=" <<  g_mapPresets[nPreset]->chorus.type << endl;
+        fileConfig << "reverb_enable=" <<  (g_vPresets[nPreset]->reverb.enable?"1":"0") << endl;
+        fileConfig << "reverb_roomsize=" <<  g_vPresets[nPreset]->reverb.roomsize << endl;
+        fileConfig << "reverb_damping=" <<  g_vPresets[nPreset]->reverb.damping << endl;
+        fileConfig << "reverb_width=" <<  g_vPresets[nPreset]->reverb.width << endl;
+        fileConfig << "reverb_level=" <<  g_vPresets[nPreset]->reverb.level << endl;
+        fileConfig << "chorus_enable=" <<  g_vPresets[nPreset]->chorus.enable << endl;
+        fileConfig << "chorus_voicecount=" <<  g_vPresets[nPreset]->chorus.voicecount << endl;
+        fileConfig << "chorus_level=" <<  g_vPresets[nPreset]->chorus.level << endl;
+        fileConfig << "chorus_speed=" <<  g_vPresets[nPreset]->chorus.speed << endl;
+        fileConfig << "chorus_depth=" <<  g_vPresets[nPreset]->chorus.depth << endl;
+        fileConfig << "chorus_type=" <<  g_vPresets[nPreset]->chorus.type << endl;
     }
     fileConfig.close();
     return true;
@@ -358,9 +359,31 @@ void save(int)
 
 void newPreset(unsigned int)
 {
-    unsigned int nPreset = g_mapPresets.size();
-    g_mapPresets[nPreset] = new Preset;
-    g_mapScreens[SCREEN_PERFORMANCE]->Add(g_mapPresets[nPreset]->name, showScreen, SCREEN_EDIT);
+    //!@todo Insert new preset at current position
+    unsigned int nPreset = g_vPresets.size();;
+    g_vPresets.push_back(new Preset);
+    g_mapScreens[SCREEN_PERFORMANCE]->Add(g_vPresets[nPreset]->name, showScreen, SCREEN_EDIT);
+    g_mapScreens[SCREEN_PERFORMANCE]->SetSelection(nPreset);
+    showScreen(SCREEN_PERFORMANCE);
+}
+
+void deletePreset(unsigned int)
+{
+    cout << "deletePreset" << endl;
+    if(g_vPresets.size() == 1)
+    {
+        showScreen(SCREEN_PERFORMANCE);
+        return; // Must have at least one preset
+    }
+    auto it = g_vPresets.begin();
+    for(unsigned i = 0; i < g_nCurrentPreset; ++i)
+        ++it;
+    delete g_vPresets[g_nCurrentPreset];
+    g_vPresets.erase(it);
+    g_mapScreens[SCREEN_PERFORMANCE]->Remove(g_nCurrentPreset);
+    if(g_nCurrentPreset)
+        --g_nCurrentPreset;
+    showScreen(SCREEN_PERFORMANCE);
 }
 
 /** Handle MIDI events */
@@ -376,8 +399,8 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
             int nProgram = fluid_midi_event_get_program(pEvent);
             string sKey = "midi.program_";
             sKey += to_string(nChannel);
-            g_mapPresets[g_nCurrentPreset]->program[nChannel].program = nProgram;
-            g_mapPresets[g_nCurrentPreset]->dirty = true;
+            g_vPresets[g_nCurrentPreset]->program[nChannel].program = nProgram;
+            g_vPresets[g_nCurrentPreset]->dirty = true;
             if(g_nCurrentScreen == SCREEN_PRESET_PROGRAM)
                 showEditProgram();
             break;
@@ -408,6 +431,9 @@ bool loadConfig(string sFilename = "./fb.config")
         printf("Error: Failed to open configuration: %s\n", sFilename.c_str());
         return false;
     }
+    for(auto it = g_vPresets.begin(); it!= g_vPresets.end(); ++it)
+        delete *it;
+    g_vPresets.clear();
     string sLine, sGroup;
     unsigned int nPreset = 0;
     while(getline(fileConfig, sLine))
@@ -430,9 +456,10 @@ bool loadConfig(string sFilename = "./fb.config")
 
             if(sGroup.substr(0,7) == "preset_")
             {
-                nPreset = validateInt(sGroup.substr(7), 0, MAX_PRESETS);
-                if(!g_mapPresets[nPreset])
-                    g_mapPresets[nPreset] = new Preset;
+                //!@todo We are not using the preset index defined in config file
+                //nPreset = validateInt(sGroup.substr(7), 0, MAX_PRESETS);
+                nPreset = g_vPresets.size();
+                g_vPresets.push_back(new Preset);
             }
             continue;
         }
@@ -445,55 +472,55 @@ bool loadConfig(string sFilename = "./fb.config")
         if(sGroup.substr(0,7) == "preset_")
         {
             if(sParam == "name")
-                g_mapPresets[nPreset]->name = sValue;
+                g_vPresets[nPreset]->name = sValue;
             else if(sParam == "soundfont")
-                g_mapPresets[nPreset]->soundfont = sValue;
+                g_vPresets[nPreset]->soundfont = sValue;
             else if(sParam.substr(0,5) == "prog_")
             {
                 int nChan = validateInt(sParam.substr(5), 0, 15);
                 nDelim = sValue.find_first_of(':');
                 if(nDelim == string::npos)
                     continue; // Not a valid bank:program value pair
-                g_mapPresets[nPreset]->program[nChan].bank = validateInt(sValue.substr(0,nDelim), 0, 16383);
-                g_mapPresets[nPreset]->program[nChan].program = validateInt(sValue.substr(nDelim + 1), 0, 127);
+                g_vPresets[nPreset]->program[nChan].bank = validateInt(sValue.substr(0,nDelim), 0, 16383);
+                g_vPresets[nPreset]->program[nChan].program = validateInt(sValue.substr(nDelim + 1), 0, 127);
             }
             else if(sParam.substr(0,6) == "level_")
             {
                 int nChan = validateInt(sParam.substr(6), 0, 15);
-                g_mapPresets[nPreset]->program[nChan].level = validateInt(sValue, 0, 127);
+                g_vPresets[nPreset]->program[nChan].level = validateInt(sValue, 0, 127);
             }
             else if(sParam.substr(0,8) == "balance_")
             {
                 int nChan = validateInt(sParam.substr(8), 0, 15);
-                g_mapPresets[nPreset]->program[nChan].balance = validateInt(sValue, 0, 127);
+                g_vPresets[nPreset]->program[nChan].balance = validateInt(sValue, 0, 127);
             }
             else if (sParam.substr(0,7) == "reverb_")
             {
                 if(sParam.substr(7) == "enable")
-                    g_mapPresets[nPreset]->reverb.enable = (sValue == "1");
+                    g_vPresets[nPreset]->reverb.enable = (sValue == "1");
                 if(sParam.substr(7) == "roomsize")
-                    g_mapPresets[nPreset]->reverb.roomsize = validateDouble(sValue, 0.0, 1.0);
+                    g_vPresets[nPreset]->reverb.roomsize = validateDouble(sValue, 0.0, 1.0);
                 if(sParam.substr(7) == "damping")
-                    g_mapPresets[nPreset]->reverb.damping = validateDouble(sValue, 0.0, 1.0);
+                    g_vPresets[nPreset]->reverb.damping = validateDouble(sValue, 0.0, 1.0);
                 if(sParam.substr(7) == "width")
-                    g_mapPresets[nPreset]->reverb.width = validateDouble(sValue, 0.0, 100.0);
+                    g_vPresets[nPreset]->reverb.width = validateDouble(sValue, 0.0, 100.0);
                 if(sParam.substr(7) == "level")
-                    g_mapPresets[nPreset]->reverb.level = validateDouble(sValue, 0.0, 1.0);
+                    g_vPresets[nPreset]->reverb.level = validateDouble(sValue, 0.0, 1.0);
             }
             else if (sParam.substr(0,7) == "chorus_")
             {
                 if(sParam.substr(7) == "enable")
-                    g_mapPresets[nPreset]->chorus.enable = (sValue == "1");
+                    g_vPresets[nPreset]->chorus.enable = (sValue == "1");
                 if(sParam.substr(7) == "voicecount")
-                    g_mapPresets[nPreset]->chorus.voicecount = validateInt(sValue, 0, 99);
+                    g_vPresets[nPreset]->chorus.voicecount = validateInt(sValue, 0, 99);
                 if(sParam.substr(7) == "level")
-                    g_mapPresets[nPreset]->chorus.level = validateDouble(sValue, 0.0, 10.0);
+                    g_vPresets[nPreset]->chorus.level = validateDouble(sValue, 0.0, 10.0);
                 if(sParam.substr(7) == "speed")
-                    g_mapPresets[nPreset]->chorus.speed = validateDouble(sValue, 0.1, 5.0);
+                    g_vPresets[nPreset]->chorus.speed = validateDouble(sValue, 0.1, 5.0);
                 if(sParam.substr(7) == "depth")
-                    g_mapPresets[nPreset]->chorus.depth = validateDouble(sValue, 0.0, 21.0);
+                    g_vPresets[nPreset]->chorus.depth = validateDouble(sValue, 0.0, 21.0);
                 if(sParam.substr(7) == "type")
-                    g_mapPresets[nPreset]->chorus.type = validateInt(sValue, 0, 1);
+                    g_vPresets[nPreset]->chorus.type = validateInt(sValue, 0, 1);
             }
         }
         else if(sGroup == "global")
@@ -519,8 +546,8 @@ bool loadSoundfont(string sFilename)
     g_nCurrentSoundfont = fluid_synth_sfload(g_pSynth, sPath.c_str(), 1);
     if(g_nCurrentSoundfont >= 0)
     {
-        g_mapPresets[g_nCurrentPreset]->soundfont = sFilename;
-        g_mapPresets[g_nCurrentPreset]->dirty = true;
+        g_vPresets[g_nCurrentPreset]->soundfont = sFilename;
+        g_vPresets[g_nCurrentPreset]->dirty = true;
     }
     return (g_nCurrentSoundfont >= 0);
 }
@@ -532,10 +559,10 @@ bool loadSoundfont(string sFilename)
 */
 bool copyPreset(unsigned int nSource, unsigned int nDestination)
 {
-    if(nSource > g_mapPresets.size() || nDestination > g_mapPresets.size() || nSource == nDestination)
+    if(nSource > g_vPresets.size() || nDestination > g_vPresets.size() || nSource == nDestination)
         return false;
-    Preset* pPresetSrc = g_mapPresets[nSource];
-    Preset* pPresetDst = g_mapPresets[nDestination];
+    Preset* pPresetSrc = g_vPresets[nSource];
+    Preset* pPresetDst = g_vPresets[nDestination];
     for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
     {
         pPresetDst->program[nChannel].program = pPresetSrc->program[nChannel].program;
@@ -566,11 +593,15 @@ bool copyPreset(unsigned int nSource, unsigned int nDestination)
 */
 bool selectPreset(unsigned int nPreset)
 {
-    if(nPreset > g_mapPresets.size())
+    if(nPreset >= g_vPresets.size())
+        nPreset = g_vPresets.size() - 1;
+    if(nPreset >= g_vPresets.size())
         return false;
     cout << "Select preset " << nPreset << endl;
-    Preset* pPreset = g_mapPresets[nPreset];
-    //if(pPreset->soundfont != g_mapPresets[nPreset]->soundfont))
+    Preset* pPreset = g_vPresets[nPreset];
+    bool bSoundfontChanged = (g_nCurrentPreset >= 0 && g_nCurrentPreset < g_vPresets.size() && pPreset->soundfont != g_vPresets[g_nCurrentPreset]->soundfont);
+    g_nCurrentPreset = nPreset;
+    // if(bSoundfontChanged)
         if(!loadSoundfont(pPreset->soundfont))
             return false;
     for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
@@ -579,7 +610,6 @@ bool selectPreset(unsigned int nPreset)
         fluid_synth_cc(g_pSynth, nChannel, 7, pPreset->program[nChannel].level);
         fluid_synth_cc(g_pSynth, nChannel, 8, pPreset->program[nChannel].balance);
     }
-    g_nCurrentPreset = nPreset;
     return true;
 }
 
@@ -724,7 +754,7 @@ int main(int argc, char** argv)
     signal(SIGINT, onSignal);
     signal(SIGTERM, onSignal);
 
-    g_mapScreens[SCREEN_PERFORMANCE] = new ListScreen(g_pScreen, "Fluidbox 20.01.01", SCREEN_PERFORMANCE);
+    g_mapScreens[SCREEN_PERFORMANCE] = new ListScreen(g_pScreen, "  riban Fluidbox", SCREEN_PERFORMANCE);
     g_mapScreens[SCREEN_EDIT_PRESET] = new ListScreen(g_pScreen, "Edit Preset", SCREEN_EDIT);
     g_mapScreens[SCREEN_EDIT] = new ListScreen(g_pScreen, "Edit", SCREEN_PERFORMANCE);
     g_mapScreens[SCREEN_POWER] = new ListScreen(g_pScreen, "Power", SCREEN_PERFORMANCE);
@@ -736,13 +766,14 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_UPDATE] = new ListScreen(g_pScreen, "Update", SCREEN_EDIT);
     g_mapScreens[SCREEN_SOUNDFONT] = new ListScreen(g_pScreen, "Soundfont", SCREEN_EDIT);
 
-    for(unsigned int nPreset=0; nPreset < g_mapPresets.size(); ++nPreset)
-        g_mapScreens[SCREEN_PERFORMANCE]->Add(g_mapPresets[nPreset]->name, showScreen, SCREEN_EDIT);
+    for(unsigned int nPreset=0; nPreset < g_vPresets.size(); ++nPreset)
+        g_mapScreens[SCREEN_PERFORMANCE]->Add(g_vPresets[nPreset]->name, showScreen, SCREEN_EDIT);
 
     g_mapScreens[SCREEN_EDIT]->Add("Mixer", showScreen, SCREEN_MIXER);
     g_mapScreens[SCREEN_EDIT]->Add("Effects", showScreen, SCREEN_EFFECTS);
     g_mapScreens[SCREEN_EDIT]->Add("Edit preset", showScreen, SCREEN_EDIT_PRESET);
     g_mapScreens[SCREEN_EDIT]->Add("New preset", newPreset);
+    g_mapScreens[SCREEN_EDIT]->Add("Delete preset", deletePreset);
     g_mapScreens[SCREEN_EDIT]->Add("Manage soundfonts", showScreen, SCREEN_SOUNDFONT);
     g_mapScreens[SCREEN_EDIT]->Add("Save", save);
     g_mapScreens[SCREEN_EDIT]->Add("Power", showScreen, SCREEN_POWER);
@@ -765,6 +796,8 @@ int main(int argc, char** argv)
 
 
     // Select preset
+    if(g_vPresets.size() == 0)
+        newPreset(0);
     selectPreset(g_nCurrentPreset);
     g_mapScreens[SCREEN_PERFORMANCE]->SetSelection(g_nCurrentPreset);
 
@@ -776,12 +809,8 @@ int main(int argc, char** argv)
         buttonHandler.Process();
         delay(5);
     }
-        //pause();
 
     // If we are here then it is all over so let's tidy up...
-
-    //Write configuration
-    saveConfig();
 
     // Clean up
     delete_fluid_midi_router(pRouter);
@@ -792,8 +821,10 @@ int main(int argc, char** argv)
     g_pScreen->Clear();
     for(auto it = g_mapScreens.begin(); it!= g_mapScreens.end(); ++it)
         delete it->second;
-    for(auto it = g_mapPresets.begin(); it!= g_mapPresets.end(); ++it)
-        delete it->second;
+    g_mapScreens.clear();
+    for(auto it = g_vPresets.begin(); it!= g_vPresets.end(); ++it)
+        delete *it;
+    g_vPresets.clear();
     return 0;
 }
 

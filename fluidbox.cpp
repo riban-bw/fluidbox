@@ -35,6 +35,7 @@
 using namespace std;
 
 enum {
+	SCREEN_NONE,
 	SCREEN_PERFORMANCE,
 	SCREEN_BLANK,
 	SCREEN_LOGO,
@@ -343,6 +344,8 @@ void showMidiActivity(int nChannel)
 */
 void showScreen(int nScreen)
 {
+    if(nScreen == SCREEN_NONE)
+        return;
     auto it = g_mapScreens.find(nScreen);
     if(it == g_mapScreens.end())
         return;
@@ -601,7 +604,7 @@ bool selectPreset(unsigned int nPreset)
     Preset* pPreset = g_vPresets[nPreset];
     bool bSoundfontChanged = (g_nCurrentPreset >= 0 && g_nCurrentPreset < g_vPresets.size() && pPreset->soundfont != g_vPresets[g_nCurrentPreset]->soundfont);
     g_nCurrentPreset = nPreset;
-    // if(bSoundfontChanged)
+    if(bSoundfontChanged || g_nCurrentSoundfont < 0)
         if(!loadSoundfont(pPreset->soundfont))
             return false;
     for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
@@ -641,7 +644,7 @@ void onNavigate(unsigned int nButton)
                     break;
             }
     }
-    if(g_nCurrentScreen == SCREEN_PERFORMANCE)
+    if(g_nCurrentScreen == SCREEN_PERFORMANCE && (nButton == BUTTON_UP || nButton == BUTTON_DOWN))
         selectPreset(g_mapScreens[SCREEN_PERFORMANCE]->GetSelection());
 }
 
@@ -754,7 +757,7 @@ int main(int argc, char** argv)
     signal(SIGINT, onSignal);
     signal(SIGTERM, onSignal);
 
-    g_mapScreens[SCREEN_PERFORMANCE] = new ListScreen(g_pScreen, "  riban Fluidbox", SCREEN_PERFORMANCE);
+    g_mapScreens[SCREEN_PERFORMANCE] = new ListScreen(g_pScreen, "  riban Fluidbox", SCREEN_NONE);
     g_mapScreens[SCREEN_EDIT_PRESET] = new ListScreen(g_pScreen, "Edit Preset", SCREEN_EDIT);
     g_mapScreens[SCREEN_EDIT] = new ListScreen(g_pScreen, "Edit", SCREEN_PERFORMANCE);
     g_mapScreens[SCREEN_POWER] = new ListScreen(g_pScreen, "Power", SCREEN_PERFORMANCE);

@@ -1,0 +1,12 @@
+[Unit]
+Description=Fluidbox synthesizer
+After=mulit-user.target
+
+[Service]
+User=pi
+LimitRTPRIO=90
+WorkingDirectory=/home/pi/fluidbox
+ExecStart=/home/pi/fluidbox/fluidboxmanager
+
+[Install]
+WantedBy=multi-user.target

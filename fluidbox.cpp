@@ -348,6 +348,8 @@ void showScreen(int nScreen)
     auto it = g_mapScreens.find(nScreen);
     if(it == g_mapScreens.end())
         return;
+    if(nScreen == SCREEN_PERFORMANCE)
+        it->second->SetSelection(g_nCurrentPreset);
     it->second->Draw();
     it->second->SetPreviousScreen(g_nCurrentScreen);
     g_nCurrentScreen = nScreen;
@@ -356,35 +358,6 @@ void showScreen(int nScreen)
 void save(int)
 {
     saveConfig();
-    showScreen(SCREEN_PERFORMANCE);
-}
-
-void newPreset(unsigned int)
-{
-    //!@todo Insert new preset at current position
-    unsigned int nPreset = g_vPresets.size();;
-    g_vPresets.push_back(new Preset);
-    g_mapScreens[SCREEN_PERFORMANCE]->Add(g_vPresets[nPreset]->name, showScreen, SCREEN_EDIT);
-    g_mapScreens[SCREEN_PERFORMANCE]->SetSelection(nPreset);
-    showScreen(SCREEN_PERFORMANCE);
-}
-
-void deletePreset(unsigned int)
-{
-    cout << "deletePreset" << endl;
-    if(g_vPresets.size() == 1)
-    {
-        showScreen(SCREEN_PERFORMANCE);
-        return; // Must have at least one preset
-    }
-    auto it = g_vPresets.begin();
-    for(unsigned i = 0; i < g_nCurrentPreset; ++i)
-        ++it;
-    delete g_vPresets[g_nCurrentPreset];
-    g_vPresets.erase(it);
-    g_mapScreens[SCREEN_PERFORMANCE]->Remove(g_nCurrentPreset);
-    if(g_nCurrentPreset)
-        --g_nCurrentPreset;
     showScreen(SCREEN_PERFORMANCE);
 }
 
@@ -615,6 +588,36 @@ bool selectPreset(unsigned int nPreset)
     return true;
 }
 
+void newPreset(unsigned int)
+{
+    //!@todo Insert new preset at current position
+    unsigned int nPreset = g_vPresets.size();;
+    g_vPresets.push_back(new Preset);
+    g_mapScreens[SCREEN_PERFORMANCE]->Add(g_vPresets[nPreset]->name, showScreen, SCREEN_EDIT);
+    selectPreset(g_vPresets.size() - 1);
+    showScreen(SCREEN_PERFORMANCE);
+}
+
+/**  Delete the currently selected preset */
+void deletePreset(unsigned int)
+{
+    if(g_vPresets.size() == 1)
+    {
+        showScreen(SCREEN_PERFORMANCE);
+        return; // Must have at least one preset
+    }
+    auto it = g_vPresets.begin();
+    for(unsigned i = 0; i < g_nCurrentPreset; ++i)
+        ++it;
+    delete *it;
+    g_vPresets.erase(it);
+    g_mapScreens[SCREEN_PERFORMANCE]->Remove(g_nCurrentPreset);
+    if(g_nCurrentPreset)
+        --g_nCurrentPreset;
+    selectPreset(g_nCurrentPreset);
+    showScreen(SCREEN_PERFORMANCE);
+}
+
 /** Handle navigation buttons
     @param nButton Index of button pressed
 */
@@ -639,7 +642,10 @@ void onNavigate(unsigned int nButton)
                     g_mapScreens[g_nCurrentScreen]->Select();
                     break;
                 case BUTTON_LEFT:
-                    showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
+                    if(g_nCurrentScreen == SCREEN_POWER)
+                        showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
+                    else
+                        showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
                     break;
             }
     }

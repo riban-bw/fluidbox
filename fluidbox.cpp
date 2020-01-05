@@ -47,7 +47,6 @@ enum {
 	SCREEN_PRESET_PROGRAM,
 	SCREEN_EFFECTS,
         SCREEN_MIXER,
-	SCREEN_UPDATE,
 	SCREEN_SOUNDFONT,
 	SCREEN_REBOOT,
 	SCREEN_EOL
@@ -766,7 +765,6 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_PRESET_PROGRAM] = new ListScreen(g_pScreen,  "Preset Program", SCREEN_EDIT_PRESET);
     g_mapScreens[SCREEN_EFFECTS] = new ListEditScreen(g_pScreen, "Effects", SCREEN_EDIT);
     g_mapScreens[SCREEN_MIXER] = new ListScreen(g_pScreen,  "Mixer", SCREEN_EDIT);
-    g_mapScreens[SCREEN_UPDATE] = new ListScreen(g_pScreen, "Update", SCREEN_EDIT);
     g_mapScreens[SCREEN_SOUNDFONT] = new ListScreen(g_pScreen, "Soundfont", SCREEN_EDIT);
 
     for(unsigned int nPreset=0; nPreset < g_vPresets.size(); ++nPreset)
@@ -780,7 +778,6 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_EDIT]->Add("Manage soundfonts", showScreen, SCREEN_SOUNDFONT);
     g_mapScreens[SCREEN_EDIT]->Add("Save", save);
     g_mapScreens[SCREEN_EDIT]->Add("Power", showScreen, SCREEN_POWER);
-    g_mapScreens[SCREEN_EDIT]->Add("Update", showScreen, SCREEN_UPDATE);
 
     g_mapScreens[SCREEN_EDIT_PRESET]->Add("Name", showScreen, SCREEN_PRESET_NAME);
     g_mapScreens[SCREEN_EDIT_PRESET]->Add("Soundfont", showScreen, SCREEN_PRESET_SF);

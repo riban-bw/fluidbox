@@ -64,7 +64,7 @@ class Button
                     if(m_cDebounce == 0x7F)
                     {
                         m_nState = STATE_RELEASED;
-                        if(m_fnOnRelease) m_fnOnRelease(m_nGpio);
+                        // if(m_fnOnRelease) m_fnOnRelease(m_nGpio);
                     }
                     else if(m_nRepeatPeriod && millis() - m_nLastPress > m_nRepeatDelay)
                     {

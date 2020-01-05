@@ -752,7 +752,7 @@ int main(int argc, char** argv)
     ButtonHandler buttonHandler;
     buttonHandler.AddButton(BUTTON_UP, onNavigate);
     buttonHandler.AddButton(BUTTON_DOWN, onNavigate);
-    buttonHandler.AddButton(BUTTON_LEFT, onNavigate, NULL, onLeftHold);
+    buttonHandler.AddButton(BUTTON_LEFT, NULL, onNavigate, onLeftHold);
     buttonHandler.AddButton(BUTTON_RIGHT, NULL, onNavigate, onRightHold);
     buttonHandler.SetRepeatPeriod(BUTTON_UP, 100);
     buttonHandler.SetRepeatPeriod(BUTTON_DOWN, 100);

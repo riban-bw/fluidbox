@@ -263,26 +263,26 @@ void power(unsigned int nAction)
     {
         case POWER_OFF:
             sCommand = "sudo poweroff";
-            sMessage = "POWERING DOWN";
+            sMessage = " POWERING DOWN";
             break;
         case POWER_OFF_SAVE:
             saveConfig();
             sCommand = "sudo poweroff";
-            sMessage = "POWERING DOWN";
+            sMessage = " POWERING DOWN";
             break;
         case POWER_REBOOT:
             sCommand = "sudo reboot";
-            sMessage = "REBOOTING";
+            sMessage = "      REBOOTING";
             break;
         case POWER_REBOOT_SAVE:
             saveConfig();
             sCommand = "sudo reboot";
-            sMessage = "REBOOTING";
+            sMessage = "      REBOOTING";
             break;
         default:
             return;
     }
-    g_pScreen->Clear(RED);
+    g_pScreen->Clear(DARK_RED);
     g_pScreen->DrawText(sMessage, 0, 60);
     system(sCommand.c_str());
 }
@@ -333,10 +333,10 @@ void showMidiActivity(int nChannel)
     if(g_nCurrentScreen != SCREEN_PRESET_PROGRAM || nChannel < g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown() || nChannel > g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown() + 6)
         return;
     int nY = 16 + (nChannel - g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown()) * 16; //Upper left corner of channel indicator
-    g_pScreen->DrawRect(158,nY, 159,nY+15, BLACK, 0, BLACK); // Clear the indicator
+    g_pScreen->DrawRect(0,nY, 1,nY+15, BLACK, 0, BLACK); // Clear the indicator
     int nCount = (g_nNoteCount[nChannel] < 16)?g_nNoteCount[nChannel]:15; // Limit max note indication to 15
     if(nCount)
-        g_pScreen->DrawRect(158,nY+15, 159,nY+15-nCount, RED, 0, RED); // Draw indicator
+        g_pScreen->DrawRect(0,nY+15, 1,nY+15-nCount, RED, 0, RED); // Draw indicator
 }
 
 /** Display the requested screen

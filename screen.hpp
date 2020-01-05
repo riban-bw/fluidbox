@@ -85,7 +85,7 @@ class ListScreen
 	        // Draw highlight
         	if(m_nSelection > -1)
         	{
-         	   	m_pScreen->DrawRect(0,nY, 160,nY+15, SELECT_BG, 0, SELECT_BG);
+         	   	m_pScreen->DrawRect(2,nY, 160,nY+15, SELECT_BG, 0, SELECT_BG);
         	}
         	// Draw entries
         	for(unsigned int nRow = 0; nRow < 7; ++nRow)

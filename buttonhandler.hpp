@@ -8,6 +8,8 @@
 #include <functional>   // provides std::function
 #include <wiringPi.h> // provides wiringPi gpio functions
 
+#define ALL_BUTTONS -1
+
 enum
 {
     STATE_RELEASED,
@@ -20,12 +22,12 @@ enum
 class Button
 {
     public:
-        Button(unsigned int gpio, std::function<void(int)> onPress, std::function<void(int)> onRelease = 0, std::function<void(int)> onHold = 0, unsigned int holdPeriod = 1000) :
+        Button(unsigned int gpio, std::function<void(int)> onPress, std::function<void(int)> onRelease = 0, std::function<void(int)> onHold = 0, unsigned int holdDelay = 1000) :
             m_nGpio(gpio),
             m_fnOnPress(onPress),
             m_fnOnRelease(onRelease),
             m_fnOnHold(onHold),
-            m_nHoldPeriod(holdPeriod),
+            m_nHoldDelay(holdDelay),
             m_nState(STATE_RELEASED)
         {
             pinMode(m_nGpio, INPUT);
@@ -53,22 +55,24 @@ class Button
                         m_nState = STATE_RELEASED;
                         if(m_fnOnRelease) m_fnOnRelease(m_nGpio);
                     }
-                    else if(millis() - m_nLastPress > m_nHoldPeriod)
+                    else if(millis() - m_nLastPress > m_nHoldDelay)
                     {
                         m_nLastPress = millis();
-                        m_nState = STATE_HELD;
-                        if(m_fnOnHold) m_fnOnHold(m_nGpio);
+                        if(m_fnOnHold)
+                        {
+                            m_nState = STATE_HELD;
+                            m_fnOnHold(m_nGpio);
+                        }
+                        else
+                        {
+                            m_nState = STATE_REPEAT;
+                        }
                     }
                     break;
                 case STATE_HELD:
                     if(m_cDebounce == 0x7F)
                     {
                         m_nState = STATE_RELEASED;
-                        // if(m_fnOnRelease) m_fnOnRelease(m_nGpio);
-                    }
-                    else if(m_nRepeatPeriod && millis() - m_nLastPress > m_nRepeatDelay)
-                    {
-                        m_nState = STATE_REPEAT;
                     }
                     break;
                 case STATE_REPEAT:
@@ -77,7 +81,7 @@ class Button
                         m_nState = STATE_RELEASED;
                         if(m_fnOnRelease) m_fnOnRelease(m_nGpio);
                     }
-                    else if(millis() - m_nLastPress > m_nRepeatPeriod)
+                    else if(m_nRepeatPeriod && (millis() - m_nLastPress > m_nRepeatPeriod))
                     {
                         m_nLastPress = millis();
                         if(m_fnOnPress) m_fnOnPress(m_nGpio);
@@ -86,19 +90,17 @@ class Button
             }
         }
 
-	void SetHoldPeriod(unsigned int period)
+	/**	Set the delay before hold event or auto repeat triggers
+	*	@param	delay Delay in ms
+	*/
+	void SetHoldDelay(unsigned int delay)
 	{
-		m_nHoldPeriod = period;
+		m_nHoldDelay = delay;
 	}
 
 	void SetRepeatPeriod(unsigned int period)
 	{
 		m_nRepeatPeriod = period;
-	}
-
-	void SetRepeatDelay(unsigned int period)
-	{
-		m_nRepeatDelay = period;
 	}
 
 
@@ -107,12 +109,11 @@ class Button
         std::function<void(int)> m_fnOnPress = 0; // Function called when button pressed
         std::function<void(int)> m_fnOnRelease = 0; // Function called when button released
         std::function<void(int)> m_fnOnHold = 0; // Function called when button held
-        unsigned int m_nHoldPeriod = 1000; // Duration in ms for onHold trigger
+        unsigned int m_nHoldDelay = 1000; // Duration in ms for onHold trigger
+        unsigned int m_nRepeatPeriod = 0; // Period between each auto-repeat - zero to disable auto-repeat
         unsigned int m_nLastPress; // Time of last button press
         unsigned char m_cDebounce = 0x7f; // Button debounce filter state
         unsigned int m_nState = STATE_RELEASED; // Current state of button
-        unsigned int m_nRepeatDelay = 500; // Period before auto button repeat triggers
-        unsigned int m_nRepeatPeriod = 0; // Period between auto button repeats - zero to disable auto-repeat
 };
 
 /**	ButtonHandler class handles button events for multiple buttons connected via GPIO */
@@ -157,61 +158,43 @@ class ButtonHandler
     			m_mapButtons[gpio] = new Button(gpio, onPress, onRelease, onHold);
 		}
 
-		/**	Set period before button hold is triggered
+		/**	Set period before button hold or auto-repeat is triggered
 		*	@param period Period in ms
 		*	@param gpio Index of gpio to configure [Default: All gpios are set]
 		*	@note  If auto-repeat is enabled and triggers before hold then hold will not trigger
 		*/
-		void SetHoldPeriod(unsigned int period, unsigned int gpio = -1)
+		void SetHoldDelay(unsigned int delay, unsigned int gpio = ALL_BUTTONS)
 		{
-			if(gpio == -1)
+			if(gpio == ALL_BUTTONS)
 				for(auto it = m_mapButtons.begin(); it != m_mapButtons.end(); ++it)
-					it->second->SetHoldPeriod(period);
+					it->second->SetHoldDelay(delay);
 			else
 			{
 				auto it = m_mapButtons.find(gpio);
 				if(it == m_mapButtons.end())
 					return;
-				it->second->SetHoldPeriod(period);
+				it->second->SetHoldDelay(delay);
 			}
 		}
        
-		/**	Set period between auto-repeat triggers
-		*	@param period Period in ms - set to zero to disable auto-repeat
-		*	@param gpio Index of gpio to configure [Default: All gpios are set]
-		*/
-		void SetRepeatPeriod(unsigned int period, unsigned int gpio = -1)
-		{
-			if(gpio == -1)
-				for(auto it = m_mapButtons.begin(); it != m_mapButtons.end(); ++it)
-					it->second->SetRepeatPeriod(period);
-			else
-			{
-				auto it = m_mapButtons.find(gpio);
-				if(it == m_mapButtons.end())
-					return;
-				it->second->SetRepeatPeriod(period);
-			}
+               /**     Set period between auto-repeat triggers
+               *       @param period Period in ms - set to zero to disable auto-repeat
+               *       @param gpio Index of gpio to configure [Default: All gpios are set]
+               */
+               void SetRepeatPeriod(unsigned int gpio, unsigned int period)
+               {
+                       if(gpio == ALL_BUTTONS)
+                               for(auto it = m_mapButtons.begin(); it != m_mapButtons.end(); ++it)
+                                       it->second->SetRepeatPeriod(period);
+                       else
+                       {
+                               auto it = m_mapButtons.find(gpio);
+                               if(it == m_mapButtons.end())
+                                       return;
+                               it->second->SetRepeatPeriod(period);
+                       }
 		}
-       
-		/**	Set period before auto-repeat starts to trigger
-		*	@param period Period in ms
-		*	@param gpio Index of gpio to configure [Default: All gpios are set]
-		*/
-		void SetRepeatDelay(unsigned int period, unsigned int gpio = -1)
-		{
-			if(gpio == -1)
-				for(auto it = m_mapButtons.begin(); it != m_mapButtons.end(); ++it)
-					it->second->SetRepeatDelay(period);
-			else
-			{
-				auto it = m_mapButtons.find(gpio);
-				if(it == m_mapButtons.end())
-					return;
-				it->second->SetRepeatDelay(period);
-			}
-		}
-       
+
 	private:
 		std::map<unsigned int, Button*> m_mapButtons;
 };

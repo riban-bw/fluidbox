@@ -689,7 +689,7 @@ void onSignal(int nSignal)
             break;
     	case SIGINT:
     	case SIGTERM:
-            printf("Received signal to quit...\n");
+            printf("\nReceived signal to quit...\n");
         	g_nRunState = 0;
             break;
     }

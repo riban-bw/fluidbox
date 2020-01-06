@@ -514,12 +514,15 @@ bool loadSoundfont(string sFilename)
     }
     string sPath = SF_ROOT;
     sPath += sFilename;
+    g_pScreen->DrawRect(20,40, 120,80, BLACK, 0, DARK_BLUE, QUADRANT_ALL, 5);
+    g_pScreen->DrawText("Loading soundfont", 30, 50, WHITE);
     g_nCurrentSoundfont = fluid_synth_sfload(g_pSynth, sPath.c_str(), 1);
     if(g_nCurrentSoundfont >= 0)
     {
         g_vPresets[g_nCurrentPreset]->soundfont = sFilename;
         g_vPresets[g_nCurrentPreset]->dirty = true;
     }
+    g_pDisplay->Draw();
     return (g_nCurrentSoundfont >= 0);
 }
 

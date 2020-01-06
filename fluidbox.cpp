@@ -195,9 +195,14 @@ void panic(int nMode=PANIC_NOTES, int nChannel=16)
         fluid_synth_system_reset(g_pSynth);
         return;
     }
-    int nMin = nChannel==16?0:nChannel;
+    int nMin = nChannel;
     int nMax = nChannel;
-    for(int i=nMin; i<nMax; ++i)
+    if(nChannel > 15)
+    {
+        nMin = 0;
+        nMax = 15;
+    }
+    for(int i = nMin; i <= nMax; ++i)
     {
         switch(nMode)
         {

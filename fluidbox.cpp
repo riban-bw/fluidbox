@@ -309,17 +309,15 @@ void showEditProgram(unsigned int=0)
     {
         fluid_synth_get_program(g_pSynth, nChannel, &nSfId, &nBank, &nProgram);
         fluid_sfont_t* pSoundfont = fluid_synth_get_sfont_by_id(g_pSynth, nSfId);
+        sprintf(sPrefix, "%02d: ", nChannel+1);
+        string sName = (char*)sPrefix;
         if(pSoundfont)
         {
             fluid_preset_t* pPreset = fluid_sfont_get_preset(pSoundfont, nBank, nProgram);
             if(pPreset)
-            {
-                sprintf(sPrefix, "%02d: ", nChannel+1);
-                string sName = (char*)sPrefix;
                 sName += fluid_preset_get_name(pPreset);
-                g_mapScreens[SCREEN_PRESET_PROGRAM]->Add(sName);
-            }
         }
+        g_mapScreens[SCREEN_PRESET_PROGRAM]->Add(sName);
     }
     showScreen(SCREEN_PRESET_PROGRAM);
 }
@@ -372,8 +370,6 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
         case 0xC0: // Program change
         {
             int nProgram = fluid_midi_event_get_program(pEvent);
-            string sKey = "midi.program_";
-            sKey += to_string(nChannel);
             g_vPresets[g_nCurrentPreset]->program[nChannel].program = nProgram;
             g_vPresets[g_nCurrentPreset]->dirty = true;
             if(g_nCurrentScreen == SCREEN_PRESET_PROGRAM)
@@ -704,7 +700,7 @@ int main(int argc, char** argv)
     g_pScreen->LoadBitmap("logo.bmp", "logo");
     g_pScreen->DrawBitmap("logo", 0, 0);
     g_nCurrentScreen = SCREEN_LOGO;
-    
+
     system("gpio mode 26 pwm");
     system("gpio pwm 26 900");
 

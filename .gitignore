@@ -30,3 +30,8 @@
 *.exe
 *.out
 *.app
+
+fb.config
+fluidbox
+fluidboxmanager
+sf2/*

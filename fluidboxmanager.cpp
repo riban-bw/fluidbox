@@ -6,6 +6,9 @@
 #include <sys/stat.h> // provides stat for file detection
 #include <unistd.h> //provides usleep
 #include <signal.h> //provides signal handler
+#include <fcntl.h>   // open
+#include <unistd.h>  // read, write, close
+#include <cstdio>    // BUFSIZ
 
 #define BUTTON_UP      4
 #define BUTTON_DOWN   17
@@ -38,24 +41,57 @@ void onSignal(int nSignal)
     }
 }
 
+void copyFile(std::string sSource, std::string sDest)
+{
+    int nSrc = open(sSource.c_str(), O_RDONLY, 0);
+    if(nSrc == -1)
+        return;
+    int nDst = open(sDest.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if(nDst == -1)
+    {
+        close(nSrc);
+        return;
+    }
+    struct stat fileStat;
+    stat(sSource.c_str(), &fileStat);
+    if(fileStat.st_blocks < 1)
+    {
+        close(nSrc);
+        close(nDst);
+        return;
+    }
+    size_t nBlocks = fileStat.st_blocks * 512 / fileStat.st_blksize; // Quantity of blocks based on file system block size
+    float fX = 0;
+    float fDx =  159.0 / nBlocks;
+    int nX = 0;
+    char* pBuffer = (char*)malloc(sizeof(char)*fileStat.st_blksize);
+    g_pScreen->DrawRect(0,100, 159,127, WHITE, 1, GREY);
+    size_t nSize;
+    while((nSize = read(nSrc, pBuffer, fileStat.st_blksize)) > 0)
+    {
+        write(nDst, pBuffer, nSize);
+        // Update progresss bar
+        fX += fDx;
+        if(int(fX) > nX)
+        {
+            nX = fX;
+            g_pScreen->DrawRect(0,100, nX,127, WHITE, 1, GREEN);
+        }
+    }
+    free(pBuffer);
+    close(nDst);
+    close(nSrc);
+}
+
 void update(int nMode)
 {
     g_pScreen->Clear(DARK_RED);
     g_pScreen->DrawText("Updating...", 40, 55);
-    g_pScreen->DrawText("Do not turn off", 20, 100);
-    switch(nMode)
-    {
-        case UPDATE_FLUIDBOX:
-            system("cp /media/usb/fluidbox .");
-            break;
-        case UPDATE_SOUNDFONT:
-            system("cp /media/usb/fluidbox.sf2 ./sf2/");
-            break;
-        case UPDATE_BOTH:
-            system("cp /media/usb/fluidbox .");
-            system("cp /media/usb/fluidbox.sf2 ./sf2/");
-            break;
-    }
+    g_pScreen->DrawText("Do not turn off", 20, 85);
+    if(nMode == UPDATE_FLUIDBOX || nMode == UPDATE_BOTH)
+        copyFile("/media/usb/fluidbox", "./fluidbox");
+    if(nMode == UPDATE_SOUNDFONT  || nMode == UPDATE_BOTH)
+        copyFile("/media/usb/fluidbox.sf2", "./sf2/fluidbox.sf2");
     g_pScreen->Clear();
     g_pScreen->DrawText("Update complete", 10, 72);
     usleep(3000000);
@@ -80,8 +116,7 @@ void onButton(unsigned int nButton)
             break;
         case BUTTON_RIGHT:
             cout << "Right" << endl;
-            update(g_pDisplay->GetSelection());
-            g_bRun = false;
+            g_bRun = !g_pDisplay->Select();
             break;
     }
 }
@@ -107,21 +142,20 @@ int main(int argc, char** argv)
     // Look for update files
     struct stat fileStat;
     bool bFluidbox = (stat ("/media/usb0/fluidbox", &fileStat) == 0 && S_ISREG(fileStat.st_mode));
-    if(bFluidbox)
-        cout << "Found fluidbox file on USB" << endl;
     bool bSoundfont = (stat ("/media/usb0/fluidbox.sf2", &fileStat) == 0 && S_ISREG(fileStat.st_mode));
-    if(bSoundfont)
-        cout << "Found fluidbox.sf2 file on USB" << endl;
     if(bFluidbox || bSoundfont)
     {
         ListScreen display(&screen, "Update available", 0);
         g_pDisplay = &display;
-        if(bFluidbox)
-            display.Add("Update fluidbox", update, UPDATE_FLUIDBOX);
-        if(bSoundfont)
-            display.Add("Update soundfont", update, UPDATE_SOUNDFONT);
-        if(bFluidbox && bSoundfont)
-            display.Add("Update both", update, UPDATE_BOTH);
+        display.Add("Update fluidbox", update, UPDATE_FLUIDBOX);
+        if(!bFluidbox)
+            display.Enable(0, false);
+        display.Add("Update soundfont", update, UPDATE_SOUNDFONT);
+        if(!bSoundfont)
+            display.Enable(1, false);
+        display.Add("Update both", update, UPDATE_BOTH);
+        if(!bFluidbox || !bSoundfont)
+            display.Enable(2, false);
         display.Draw();
 
         // Configure buttons

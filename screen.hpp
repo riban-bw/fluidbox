@@ -7,6 +7,7 @@
 #define TITLE_FG WHITE
 #define SELECT_BG BLUE
 #define ENTRY_FG WHITE
+#define DISABLED_FG GREY
 
 
 using namespace std;
@@ -17,6 +18,7 @@ struct ListEntry {
     string title; // Title to display in list
     std::function<void(int)> function = NULL;  // Function to call on selection - default is none
     int param;
+    bool enabled = true;
 };
 
 
@@ -92,11 +94,14 @@ class ListScreen
         	{
            	 	if(nRow + m_nFirstEntry > m_vEntries.size() - 1)
                			 return; // Reached end of list
-           	 	m_pScreen->DrawText(m_vEntries[nRow + m_nFirstEntry]->title, 2, 16*(nRow+2) - 2, ENTRY_FG);
+           	 	if(m_vEntries[nRow + m_nFirstEntry]->enabled)
+			    m_pScreen->DrawText(m_vEntries[nRow + m_nFirstEntry]->title, 2, 16*(nRow+2) - 2, ENTRY_FG);
+           	 	else
+           	 	    m_pScreen->DrawText(m_vEntries[nRow + m_nFirstEntry]->title, 2, 16*(nRow+2) - 2, DISABLED_FG);
         	}
 	}
 
-    void Add(string title, std::function<void(int)> function = NULL, int param=0)
+    int Add(string title, std::function<void(int)> function = NULL, int param=0)
     {
         ListEntry* pEntry = new ListEntry;
         pEntry->title = title;
@@ -105,6 +110,7 @@ class ListScreen
         m_vEntries.push_back(pEntry);
         if(m_nSelection < 1)
             m_nSelection = 0;
+	return m_vEntries.size() - 1;
     };
 
 	void Remove(unsigned int nIndex)
@@ -114,6 +120,8 @@ class ListScreen
 		auto it = m_vEntries.begin();
     		for(unsigned i = 0; i < nIndex; ++i)
 		        ++it;
+		if(it == m_vEntries.end())
+			return;
 		m_vEntries.erase(it);
 		if(m_nSelection >= nIndex)
 			--m_nSelection;
@@ -126,34 +134,61 @@ class ListScreen
         m_vEntries.clear();
     }
 
-    void Select()
+    /**  Trigger the function of the currently selected entry
+    *    @retval bool True if function triggered
+    */
+    bool Select()
     {
-        if(m_nSelection < m_vEntries.size())
+        if(m_nSelection >= 0 && m_nSelection < m_vEntries.size() && m_vEntries[m_nSelection]->enabled && m_vEntries[m_nSelection]->function)
         {
-            if(!m_vEntries[m_nSelection]->function)
-                return;
             m_vEntries[m_nSelection]->function(m_vEntries[m_nSelection]->param);
+                return true;
         }
+        return false;
     };
 
     void Next()
     {
-        if(m_nSelection < m_vEntries.size() - 1)
-        {
-            if(++m_nSelection > m_nFirstEntry + 6)
-                ++m_nFirstEntry;
-            Draw();
-        }
+	for(int nIndex = m_nSelection + 1; nIndex < m_vEntries.size(); ++nIndex)
+	{
+		if(m_vEntries[nIndex]->enabled)
+		{
+			m_nSelection = nIndex;
+			break;
+		}
+	}
+        if(m_nSelection > m_nFirstEntry + 6)
+                m_nFirstEntry = m_nSelection - 6;
+        Draw();
     };
+
     void Previous()
     {
-        if(m_nSelection > 0)
-        {
-            if(--m_nSelection < m_nFirstEntry)
-                --m_nFirstEntry;
-            Draw();
-        }
+	for(int nIndex = m_nSelection -1; nIndex >= 0; --nIndex)
+	{
+		if(m_vEntries[nIndex]->enabled)
+		{
+			m_nSelection = nIndex;
+			break;
+		}
+	}
+        if(m_nSelection < m_nFirstEntry)
+                m_nFirstEntry = m_nSelection;
+        Draw();
     };
+
+        void Enable(unsigned int nEntry, bool bEnable = true)
+        {
+		auto it = m_vEntries.begin();
+		unsigned int nIndex = 0;
+    		for(nIndex = 0; nIndex < nEntry; ++nIndex)
+		        ++it;
+		if(it == m_vEntries.end())
+			return;
+		(*it)->enabled = bEnable;
+		if(m_nSelection == nIndex)
+			--m_nSelection;
+        }
 
 
 	protected:

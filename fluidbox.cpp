@@ -73,6 +73,14 @@ enum {
     REVERB_LEVEL
 };
 
+enum {
+    CHORUS_ENABLE,
+    CHORUS_VOICES,
+    CHORUS_LEVEL,
+    CHORUS_SPEED,
+    CHORUS_DEPTH,
+    CHORUS_TYPE
+};
 
 struct Program {
     string name = "New program";
@@ -302,6 +310,10 @@ void editReverb(unsigned int nParam)
         case REVERB_LEVEL:
             break;
     }
+}
+
+void editChorus(unsigned int nParam)
+{
 }
 
 /**  Shows the edit program screen */
@@ -804,11 +816,21 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_POWER]->Add("Reboot",  power, POWER_REBOOT);
 
     g_mapScreens[SCREEN_EFFECTS]->Add("Reverb enable", editReverb, REVERB_ENABLE);
-    g_mapScreens[SCREEN_EFFECTS]->Add("Reverb room size", editReverb, REVERB_ROOMSIZE);
-    g_mapScreens[SCREEN_EFFECTS]->Add("Reverb damping", editReverb, REVERB_DAMPING);
-    g_mapScreens[SCREEN_EFFECTS]->Add("Reverb width", editReverb, REVERB_WIDTH);
-    g_mapScreens[SCREEN_EFFECTS]->Add("Reverb level", editReverb, REVERB_LEVEL);
+    int nIndex = g_mapScreens[SCREEN_EFFECTS]->Add("Reverb room size", editReverb, REVERB_ROOMSIZE);
+    g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, false);
+    nIndex = g_mapScreens[SCREEN_EFFECTS]->Add("Reverb damping", editReverb, REVERB_DAMPING);
+    g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, false);
+    nIndex = g_mapScreens[SCREEN_EFFECTS]->Add("Reverb width", editReverb, REVERB_WIDTH);
+    g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, false);
+    nIndex = g_mapScreens[SCREEN_EFFECTS]->Add("Reverb level", editReverb, REVERB_LEVEL);
+    g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, false);
 
+    g_mapScreens[SCREEN_EFFECTS]->Add("Chorus enable", editChorus, CHORUS_ENABLE);
+    g_mapScreens[SCREEN_EFFECTS]->Add("Chorus voices", editChorus, CHORUS_VOICES);
+    g_mapScreens[SCREEN_EFFECTS]->Add("Chorus level", editChorus, CHORUS_LEVEL);
+    g_mapScreens[SCREEN_EFFECTS]->Add("Chorus speed", editChorus, CHORUS_SPEED);
+    g_mapScreens[SCREEN_EFFECTS]->Add("Chorus depth", editChorus, CHORUS_DEPTH);
+    g_mapScreens[SCREEN_EFFECTS]->Add("Chorus type", editChorus, CHORUS_TYPE);
 
     // Select preset
     if(g_vPresets.size() == 0)

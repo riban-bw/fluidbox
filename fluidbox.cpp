@@ -207,10 +207,10 @@ void panic(int nMode=PANIC_NOTES, int nChannel=16)
         switch(nMode)
         {
             case PANIC_NOTES:
-                fluid_synth_all_notes_off(g_pSynth, nChannel);
+                fluid_synth_all_notes_off(g_pSynth, i);
                 break;
             case PANIC_SOUNDS:
-                fluid_synth_all_sounds_off(g_pSynth, nChannel);
+                fluid_synth_all_sounds_off(g_pSynth, i);
                 break;
         }
     }
@@ -348,6 +348,12 @@ void showScreen(int nScreen)
 {
     if(nScreen == SCREEN_NONE)
         return;
+    if(nScreen == SCREEN_LOGO)
+    {
+        g_pScreen->DrawBitmap("logo", 0, 0);
+        g_nCurrentScreen = SCREEN_LOGO;
+        return;
+    }
     auto it = g_mapScreens.find(nScreen);
     if(it == g_mapScreens.end())
         return;
@@ -519,15 +525,15 @@ bool loadSoundfont(string sFilename)
     }
     string sPath = SF_ROOT;
     sPath += sFilename;
-    g_pScreen->DrawRect(20,40, 120,80, BLACK, 0, DARK_BLUE, QUADRANT_ALL, 5);
-    g_pScreen->DrawText("Loading soundfont", 30, 50, WHITE);
+    g_pScreen->DrawRect(2,100, 157,124, DARK_BLUE, 5, DARK_BLUE, QUADRANT_ALL, 5);
+    g_pScreen->DrawText("Loading soundfont", 4, 118, WHITE);
     g_nCurrentSoundfont = fluid_synth_sfload(g_pSynth, sPath.c_str(), 1);
     if(g_nCurrentSoundfont >= 0)
     {
         g_vPresets[g_nCurrentPreset]->soundfont = sFilename;
         g_vPresets[g_nCurrentPreset]->dirty = true;
     }
-    g_pDisplay->Draw();
+    showScreen(g_nCurrentScreen);
     return (g_nCurrentSoundfont >= 0);
 }
 
@@ -706,8 +712,7 @@ int main(int argc, char** argv)
     printf("riban fluidbox\n");
     g_pScreen = new ribanfblib("/dev/fb1");
     g_pScreen->LoadBitmap("logo.bmp", "logo");
-    g_pScreen->DrawBitmap("logo", 0, 0);
-    g_nCurrentScreen = SCREEN_LOGO;
+    showScreen(SCREEN_LOGO);
 
     system("gpio mode 26 pwm");
     system("gpio pwm 26 900");

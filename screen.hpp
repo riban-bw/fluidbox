@@ -14,7 +14,8 @@ using namespace std;
 
 
 // An entry in a list screen
-struct ListEntry {
+struct ListEntry
+{
     string title; // Title to display in list
     std::function<void(int)> function = NULL;  // Function to call on selection - default is none
     int param;
@@ -24,82 +25,82 @@ struct ListEntry {
 
 class ListScreen
 {
-	public:
-	/**	Instantiate a Screen object
-	*	@param	pScreen Pointer to a riban frame buffer object
-	*	@param	sTitle	Title to display at top of screen
-	*	@param	nParent Index of parent screen
-	*/
-	ListScreen(ribanfblib* pScreen, string sTitle, unsigned int nParent) :
-		m_pScreen(pScreen),
-		m_sTitle(sTitle),
-		m_nParent(nParent)
-	{
-	}
-		
-	~ListScreen()
-	{
-		for(auto it = m_vEntries.begin(); it != m_vEntries.end(); ++it)
-			delete *it;
-	}
+public:
+    /**	Instantiate a Screen object
+    *	@param	pScreen Pointer to a riban frame buffer object
+    *	@param	sTitle	Title to display at top of screen
+    *	@param	nParent Index of parent screen
+    */
+    ListScreen(ribanfblib* pScreen, string sTitle, unsigned int nParent) :
+        m_pScreen(pScreen),
+        m_sTitle(sTitle),
+        m_nParent(nParent)
+    {
+    }
 
-	void SetPreviousScreen(unsigned int nScreen)
-	{
-		m_nPreviousScreen = nScreen;
-	}
+    ~ListScreen()
+    {
+        for(auto it = m_vEntries.begin(); it != m_vEntries.end(); ++it)
+            delete *it;
+    }
 
-	unsigned int GetPreviousScreen()
-	{
-		return m_nPreviousScreen;
-	}
+    void SetPreviousScreen(unsigned int nScreen)
+    {
+        m_nPreviousScreen = nScreen;
+    }
 
-	unsigned int GetParent()
-	{
-		return m_nParent;
-	}
+    unsigned int GetPreviousScreen()
+    {
+        return m_nPreviousScreen;
+    }
 
-	int GetSelection()
-	{
-		return m_nSelection;
-	}
+    unsigned int GetParent()
+    {
+        return m_nParent;
+    }
 
-	void SetSelection(int nSelection)
-	{
-		if(nSelection < m_vEntries.size())
-			m_nSelection = nSelection;
-	}
+    int GetSelection()
+    {
+        return m_nSelection;
+    }
 
-	int GetFirstShown()
-	{
-		return m_nFirstEntry;
-	}
+    void SetSelection(int nSelection)
+    {
+        if(nSelection < m_vEntries.size())
+            m_nSelection = nSelection;
+    }
 
-	/**	Display the screen */
-	virtual void Draw() 
-	{
-		m_pScreen->Clear();
-		m_pScreen->DrawRect(0,0, 160,16, TITLE_BG, 0, TITLE_BG);
-		m_pScreen->DrawText(m_sTitle, 5, 14, TITLE_FG);
-		if(!m_vEntries.size())
-			return;
+    int GetFirstShown()
+    {
+        return m_nFirstEntry;
+    }
 
-		int nY = (1 + m_nSelection - m_nFirstEntry) * 16;
-	        // Draw highlight
-        	if(m_nSelection > -1)
-        	{
-         	   	m_pScreen->DrawRect(2,nY, 160,nY+15, SELECT_BG, 0, SELECT_BG);
-        	}
-        	// Draw entries
-        	for(unsigned int nRow = 0; nRow < 7; ++nRow)
-        	{
-           	 	if(nRow + m_nFirstEntry > m_vEntries.size() - 1)
-               			 return; // Reached end of list
-           	 	if(m_vEntries[nRow + m_nFirstEntry]->enabled)
-			    m_pScreen->DrawText(m_vEntries[nRow + m_nFirstEntry]->title, 2, 16*(nRow+2) - 2, ENTRY_FG);
-           	 	else
-           	 	    m_pScreen->DrawText(m_vEntries[nRow + m_nFirstEntry]->title, 2, 16*(nRow+2) - 2, DISABLED_FG);
-        	}
-	}
+    /**	Display the screen */
+    virtual void Draw()
+    {
+        m_pScreen->Clear();
+        m_pScreen->DrawRect(0,0, 160,16, TITLE_BG, 0, TITLE_BG);
+        m_pScreen->DrawText(m_sTitle, 5, 14, TITLE_FG);
+        if(!m_vEntries.size())
+            return;
+
+        int nY = (1 + m_nSelection - m_nFirstEntry) * 16;
+        // Draw highlight
+        if(m_nSelection > -1)
+        {
+            m_pScreen->DrawRect(2,nY, 160,nY+15, SELECT_BG, 0, SELECT_BG);
+        }
+        // Draw entries
+        for(unsigned int nRow = 0; nRow < 7; ++nRow)
+        {
+            if(nRow + m_nFirstEntry > m_vEntries.size() - 1)
+                return; // Reached end of list
+            if(m_vEntries[nRow + m_nFirstEntry]->enabled)
+                m_pScreen->DrawText(m_vEntries[nRow + m_nFirstEntry]->title, 2, 16*(nRow+2) - 2, ENTRY_FG);
+            else
+                m_pScreen->DrawText(m_vEntries[nRow + m_nFirstEntry]->title, 2, 16*(nRow+2) - 2, DISABLED_FG);
+        }
+    }
 
     int Add(string title, std::function<void(int)> function = NULL, int param=0)
     {
@@ -110,22 +111,22 @@ class ListScreen
         m_vEntries.push_back(pEntry);
         if(m_nSelection < 1)
             m_nSelection = 0;
-	return m_vEntries.size() - 1;
+        return m_vEntries.size() - 1;
     };
 
-	void Remove(unsigned int nIndex)
-	{
-		if(nIndex >= m_vEntries.size())
-			return;
-		auto it = m_vEntries.begin();
-    		for(unsigned i = 0; i < nIndex; ++i)
-		        ++it;
-		if(it == m_vEntries.end())
-			return;
-		m_vEntries.erase(it);
-		if(m_nSelection >= nIndex)
-			--m_nSelection;
-	}
+    void Remove(unsigned int nIndex)
+    {
+        if(nIndex >= m_vEntries.size())
+            return;
+        auto it = m_vEntries.begin();
+        for(unsigned i = 0; i < nIndex; ++i)
+            ++it;
+        if(it == m_vEntries.end())
+            return;
+        m_vEntries.erase(it);
+        if(m_nSelection >= nIndex)
+            --m_nSelection;
+    }
 
     void ClearList()
     {
@@ -142,85 +143,85 @@ class ListScreen
         if(m_nSelection >= 0 && m_nSelection < m_vEntries.size() && m_vEntries[m_nSelection]->enabled && m_vEntries[m_nSelection]->function)
         {
             m_vEntries[m_nSelection]->function(m_vEntries[m_nSelection]->param);
-                return true;
+            return true;
         }
         return false;
     };
 
     void Next()
     {
-	for(int nIndex = m_nSelection + 1; nIndex < m_vEntries.size(); ++nIndex)
-	{
-		if(m_vEntries[nIndex]->enabled)
-		{
-			m_nSelection = nIndex;
-			break;
-		}
-	}
+        for(int nIndex = m_nSelection + 1; nIndex < m_vEntries.size(); ++nIndex)
+        {
+            if(m_vEntries[nIndex]->enabled)
+            {
+                m_nSelection = nIndex;
+                break;
+            }
+        }
         if(m_nSelection > m_nFirstEntry + 6)
-                m_nFirstEntry = m_nSelection - 6;
+            m_nFirstEntry = m_nSelection - 6;
         Draw();
     };
 
     void Previous()
     {
-	for(int nIndex = m_nSelection -1; nIndex >= 0; --nIndex)
-	{
-		if(m_vEntries[nIndex]->enabled)
-		{
-			m_nSelection = nIndex;
-			break;
-		}
-	}
+        for(int nIndex = m_nSelection -1; nIndex >= 0; --nIndex)
+        {
+            if(m_vEntries[nIndex]->enabled)
+            {
+                m_nSelection = nIndex;
+                break;
+            }
+        }
         if(m_nSelection < m_nFirstEntry)
-                m_nFirstEntry = m_nSelection;
+            m_nFirstEntry = m_nSelection;
         Draw();
     };
 
-        void Enable(unsigned int nEntry, bool bEnable = true)
-        {
-		auto it = m_vEntries.begin();
-		unsigned int nIndex = 0;
-    		for(nIndex = 0; nIndex < nEntry; ++nIndex)
-		        ++it;
-		if(it == m_vEntries.end())
-			return;
-		(*it)->enabled = bEnable;
-		if(m_nSelection == nIndex)
-			--m_nSelection;
-        }
+    void Enable(unsigned int nEntry, bool bEnable = true)
+    {
+        auto it = m_vEntries.begin();
+        unsigned int nIndex = 0;
+        for(nIndex = 0; nIndex < nEntry; ++nIndex)
+            ++it;
+        if(it == m_vEntries.end())
+            return;
+        (*it)->enabled = bEnable;
+        if(m_nSelection == nIndex)
+            --m_nSelection;
+    }
 
 
-	protected:
-	ribanfblib* m_pScreen;
-	string m_sTitle;
+protected:
+    ribanfblib* m_pScreen;
+    string m_sTitle;
 
-	unsigned int m_nPreviousScreen = 0;
-	unsigned int m_nParent = 0;
-	int m_nSelection = -1; // Index of selected item
-	std::vector<ListEntry*> m_vEntries; // List of entries
-	unsigned int m_nFirstEntry = 0; // Index of first item to display
+    unsigned int m_nPreviousScreen = 0;
+    unsigned int m_nParent = 0;
+    int m_nSelection = -1; // Index of selected item
+    std::vector<ListEntry*> m_vEntries; // List of entries
+    unsigned int m_nFirstEntry = 0; // Index of first item to display
 };
 
 
 class ListEditScreen : public ListScreen
 {
-	public:
-	ListEditScreen(ribanfblib* pScreen, string sTitle, unsigned int nParent) :
-		ListScreen(pScreen, sTitle, nParent)
-	{
-	}
+public:
+    ListEditScreen(ribanfblib* pScreen, string sTitle, unsigned int nParent) :
+        ListScreen(pScreen, sTitle, nParent)
+    {
+    }
 
-	void Draw() 
-	{
-		ListScreen::Draw();
-		if(!m_vEntries.size())
-			return;
-        	for(unsigned int nRow = 0; nRow < 7; ++nRow)
-        	{
-           	 	if(nRow + m_nFirstEntry > m_vEntries.size() - 1)
-               		 	return; // Reached end of list
-           		 m_pScreen->DrawRect(140, 16*(nRow+2), 159, 16*(nRow + 1), WHITE);
-		}
-	}
+    void Draw()
+    {
+        ListScreen::Draw();
+        if(!m_vEntries.size())
+            return;
+        for(unsigned int nRow = 0; nRow < 7; ++nRow)
+        {
+            if(nRow + m_nFirstEntry > m_vEntries.size() - 1)
+                return; // Reached end of list
+            m_pScreen->DrawRect(140, 16*(nRow+2), 159, 16*(nRow + 1), WHITE);
+        }
+    }
 };

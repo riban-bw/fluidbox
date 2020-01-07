@@ -16,7 +16,8 @@
 #define GPIO_LED      26
 using namespace std;
 
-enum {
+enum
+{
     UPDATE_FLUIDBOX,
     UPDATE_SOUNDFONT,
     UPDATE_BOTH
@@ -34,11 +35,11 @@ void onSignal(int nSignal)
 {
     switch(nSignal)
     {
-        case SIGINT:
-        case SIGTERM:
-            printf("\nReceived signal to quit...\n");
-                g_bRun = false;
-            break;
+    case SIGINT:
+    case SIGTERM:
+        printf("\nReceived signal to quit...\n");
+        g_bRun = false;
+        break;
     }
 }
 
@@ -105,22 +106,22 @@ void onButton(unsigned int nButton)
 
     switch(nButton)
     {
-        case BUTTON_UP:
-            cout << "Up" << endl;
-            g_pDisplay->Previous();
-            break;
-        case BUTTON_DOWN:
-            cout << "Down" << endl;
-            g_pDisplay->Next();
-            break;
-        case BUTTON_LEFT:
-            cout << "Left" << endl;
-            g_bRun = false;
-            break;
-        case BUTTON_RIGHT:
-            cout << "Right" << endl;
-            g_bRun = !g_pDisplay->Select();
-            break;
+    case BUTTON_UP:
+        cout << "Up" << endl;
+        g_pDisplay->Previous();
+        break;
+    case BUTTON_DOWN:
+        cout << "Down" << endl;
+        g_pDisplay->Next();
+        break;
+    case BUTTON_LEFT:
+        cout << "Left" << endl;
+        g_bRun = false;
+        break;
+    case BUTTON_RIGHT:
+        cout << "Right" << endl;
+        g_bRun = !g_pDisplay->Select();
+        break;
     }
 }
 

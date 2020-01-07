@@ -34,38 +34,42 @@
 
 using namespace std;
 
-enum {
-	SCREEN_NONE,
-	SCREEN_PERFORMANCE,
-	SCREEN_BLANK,
-	SCREEN_LOGO,
-	SCREEN_EDIT,
-	SCREEN_POWER,
-	SCREEN_EDIT_PRESET,
-	SCREEN_PRESET_NAME,
-	SCREEN_PRESET_SF,
-	SCREEN_PRESET_PROGRAM,
-	SCREEN_EFFECTS,
-        SCREEN_MIXER,
-	SCREEN_SOUNDFONT,
-	SCREEN_REBOOT,
-	SCREEN_EOL
+enum
+{
+    SCREEN_NONE,
+    SCREEN_PERFORMANCE,
+    SCREEN_BLANK,
+    SCREEN_LOGO,
+    SCREEN_EDIT,
+    SCREEN_POWER,
+    SCREEN_EDIT_PRESET,
+    SCREEN_PRESET_NAME,
+    SCREEN_PRESET_SF,
+    SCREEN_PRESET_PROGRAM,
+    SCREEN_EFFECTS,
+    SCREEN_MIXER,
+    SCREEN_SOUNDFONT,
+    SCREEN_REBOOT,
+    SCREEN_EOL
 };
 
-enum {
+enum
+{
     PANIC_NOTES,
     PANIC_SOUNDS,
     PANIC_RESET
 };
 
-enum {
+enum
+{
     POWER_OFF,
     POWER_OFF_SAVE,
     POWER_REBOOT,
     POWER_REBOOT_SAVE
 };
 
-enum {
+enum
+{
     REVERB_ENABLE,
     REVERB_ROOMSIZE,
     REVERB_DAMPING,
@@ -73,7 +77,8 @@ enum {
     REVERB_LEVEL
 };
 
-enum {
+enum
+{
     CHORUS_ENABLE,
     CHORUS_VOICES,
     CHORUS_LEVEL,
@@ -82,7 +87,8 @@ enum {
     CHORUS_TYPE
 };
 
-struct Program {
+struct Program
+{
     string name = "New program";
     unsigned int bank = 0;
     unsigned int program = 0;
@@ -90,7 +96,8 @@ struct Program {
     unsigned int balance = 63;
 };
 
-struct Reverb {
+struct Reverb
+{
     bool enable = false;
     double roomsize = 0;
     double damping = 0;
@@ -98,7 +105,8 @@ struct Reverb {
     double level = 0;
 };
 
-struct Chorus {
+struct Chorus
+{
     bool enable = false;
     int voicecount = 0;
     double level = 0;
@@ -107,7 +115,8 @@ struct Chorus {
     int type = 0;
 };
 
-struct Preset {
+struct Preset
+{
     string name = "New preset";
     string soundfont = DEFAULT_SOUNDFONT;
     Program program[16];
@@ -214,12 +223,12 @@ void panic(int nMode=PANIC_NOTES, int nChannel=16)
     {
         switch(nMode)
         {
-            case PANIC_NOTES:
-                fluid_synth_all_notes_off(g_pSynth, i);
-                break;
-            case PANIC_SOUNDS:
-                fluid_synth_all_sounds_off(g_pSynth, i);
-                break;
+        case PANIC_NOTES:
+            fluid_synth_all_notes_off(g_pSynth, i);
+            break;
+        case PANIC_SOUNDS:
+            fluid_synth_all_sounds_off(g_pSynth, i);
+            break;
         }
     }
 }
@@ -273,26 +282,26 @@ void power(unsigned int nAction)
     string sCommand, sMessage;
     switch(nAction)
     {
-        case POWER_OFF:
-            sCommand = "sudo poweroff";
-            sMessage = " POWERING DOWN";
-            break;
-        case POWER_OFF_SAVE:
-            saveConfig();
-            sCommand = "sudo poweroff";
-            sMessage = " POWERING DOWN";
-            break;
-        case POWER_REBOOT:
-            sCommand = "sudo reboot";
-            sMessage = "      REBOOTING";
-            break;
-        case POWER_REBOOT_SAVE:
-            saveConfig();
-            sCommand = "sudo reboot";
-            sMessage = "      REBOOTING";
-            break;
-        default:
-            return;
+    case POWER_OFF:
+        sCommand = "sudo poweroff";
+        sMessage = " POWERING DOWN";
+        break;
+    case POWER_OFF_SAVE:
+        saveConfig();
+        sCommand = "sudo poweroff";
+        sMessage = " POWERING DOWN";
+        break;
+    case POWER_REBOOT:
+        sCommand = "sudo reboot";
+        sMessage = "      REBOOTING";
+        break;
+    case POWER_REBOOT_SAVE:
+        saveConfig();
+        sCommand = "sudo reboot";
+        sMessage = "      REBOOTING";
+        break;
+    default:
+        return;
     }
     g_pScreen->Clear(DARK_RED);
     g_pScreen->DrawText(sMessage, 0, 60);
@@ -303,12 +312,12 @@ void editReverb(unsigned int nParam)
 {
     switch(nParam)
     {
-        case REVERB_ENABLE:
-        case REVERB_ROOMSIZE:
-        case REVERB_DAMPING:
-        case REVERB_WIDTH:
-        case REVERB_LEVEL:
-            break;
+    case REVERB_ENABLE:
+    case REVERB_ROOMSIZE:
+    case REVERB_DAMPING:
+    case REVERB_WIDTH:
+    case REVERB_LEVEL:
+        break;
     }
 }
 
@@ -390,26 +399,26 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
     int nType = fluid_midi_event_get_type(pEvent);
     switch(nType)
     {
-        case 0xC0: // Program change
-        {
-            int nProgram = fluid_midi_event_get_program(pEvent);
-            g_vPresets[g_nCurrentPreset]->program[nChannel].program = nProgram;
-            g_vPresets[g_nCurrentPreset]->dirty = true;
-            if(g_nCurrentScreen == SCREEN_PRESET_PROGRAM)
-                showEditProgram();
-            break;
-        }
-        case 0x80: // Note off
-            if(g_nNoteCount[nChannel] > 0)
-                g_nNoteCount[nChannel]--;
-            showMidiActivity(nChannel);
-            break;
-        case 0x90: // Note on
-            g_nNoteCount[nChannel]++;
-            showMidiActivity(nChannel);
-            break;
-        default:
-            printf("event type: 0x%02x\n", nType);
+    case 0xC0: // Program change
+    {
+        int nProgram = fluid_midi_event_get_program(pEvent);
+        g_vPresets[g_nCurrentPreset]->program[nChannel].program = nProgram;
+        g_vPresets[g_nCurrentPreset]->dirty = true;
+        if(g_nCurrentScreen == SCREEN_PRESET_PROGRAM)
+            showEditProgram();
+        break;
+    }
+    case 0x80: // Note off
+        if(g_nNoteCount[nChannel] > 0)
+            g_nNoteCount[nChannel]--;
+        showMidiActivity(nChannel);
+        break;
+    case 0x90: // Note on
+        g_nNoteCount[nChannel]++;
+        showMidiActivity(nChannel);
+        break;
+    default:
+        printf("event type: 0x%02x\n", nType);
     }
     return 0;
 }
@@ -647,29 +656,29 @@ void onNavigate(unsigned int nButton)
 {
     switch(g_nCurrentScreen)
     {
-        case SCREEN_LOGO:
-        case SCREEN_BLANK:
-            showScreen(SCREEN_PERFORMANCE);
+    case SCREEN_LOGO:
+    case SCREEN_BLANK:
+        showScreen(SCREEN_PERFORMANCE);
+        break;
+    default:
+        switch(nButton)
+        {
+        case BUTTON_UP:
+            g_mapScreens[g_nCurrentScreen]->Previous();
             break;
-        default:
-            switch(nButton)
-            {
-                case BUTTON_UP:
-                    g_mapScreens[g_nCurrentScreen]->Previous();
-                    break;
-                case BUTTON_DOWN:
-                    g_mapScreens[g_nCurrentScreen]->Next();
-                    break;
-                case BUTTON_RIGHT:
-                    g_mapScreens[g_nCurrentScreen]->Select();
-                    break;
-                case BUTTON_LEFT:
-                    if(g_nCurrentScreen == SCREEN_POWER)
-                        showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
-                    else
-                        showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
-                    break;
-            }
+        case BUTTON_DOWN:
+            g_mapScreens[g_nCurrentScreen]->Next();
+            break;
+        case BUTTON_RIGHT:
+            g_mapScreens[g_nCurrentScreen]->Select();
+            break;
+        case BUTTON_LEFT:
+            if(g_nCurrentScreen == SCREEN_POWER)
+                showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
+            else
+                showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
+            break;
+        }
     }
     if(g_nCurrentScreen == SCREEN_PERFORMANCE && (nButton == BUTTON_UP || nButton == BUTTON_DOWN))
         selectPreset(g_mapScreens[SCREEN_PERFORMANCE]->GetSelection());
@@ -679,11 +688,11 @@ void onLeftHold(unsigned int nGpio)
 {
     switch(g_nCurrentScreen)
     {
-        case SCREEN_PERFORMANCE:
-            showScreen(SCREEN_POWER);
-            break;
-        default:
-            showScreen(SCREEN_PERFORMANCE);
+    case SCREEN_PERFORMANCE:
+        showScreen(SCREEN_POWER);
+        break;
+    default:
+        showScreen(SCREEN_PERFORMANCE);
     }
 }
 
@@ -691,11 +700,11 @@ void onRightHold(unsigned int nGpio)
 {
     switch(g_nCurrentScreen)
     {
-        case SCREEN_PRESET_NAME:
-            showScreen(SCREEN_EDIT_PRESET);
-            break;
-        default:
-            panic();
+    case SCREEN_PRESET_NAME:
+        showScreen(SCREEN_EDIT_PRESET);
+        break;
+    default:
+        panic();
     }
 }
 
@@ -704,16 +713,16 @@ void onSignal(int nSignal)
 {
     switch(nSignal)
     {
-    	case SIGALRM:
-    	    // We use alarm to drop back to performance screen after idle delay
-            if(g_nCurrentScreen == SCREEN_LOGO)
-                showScreen(SCREEN_PERFORMANCE);
-            break;
-    	case SIGINT:
-    	case SIGTERM:
-            printf("\nReceived signal to quit...\n");
-        	g_nRunState = 0;
-            break;
+    case SIGALRM:
+        // We use alarm to drop back to performance screen after idle delay
+        if(g_nCurrentScreen == SCREEN_LOGO)
+            showScreen(SCREEN_PERFORMANCE);
+        break;
+    case SIGINT:
+    case SIGTERM:
+        printf("\nReceived signal to quit...\n");
+        g_nRunState = 0;
+        break;
     }
 }
 

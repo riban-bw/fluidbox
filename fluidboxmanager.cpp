@@ -8,13 +8,12 @@
 #include <signal.h> //provides signal handler
 #include <fcntl.h>   // open
 #include <unistd.h>  // read, write, close
-#include <cstdio>    // BUFSIZ
 
 #define BUTTON_UP      4
 #define BUTTON_DOWN   17
 #define BUTTON_LEFT   27
 #define BUTTON_RIGHT   3
-
+#define GPIO_LED      26
 using namespace std;
 
 enum {
@@ -23,19 +22,21 @@ enum {
     UPDATE_BOTH
 };
 
-bool g_bRun = true;
-unsigned int g_nCountdown = 159;
-ListScreen* g_pDisplay;
-ribanfblib* g_pScreen;
+bool g_bRun = true; // True whilst in program loop
+unsigned int g_nCountdown = 159; // Used to draw countdown progress bar
+ListScreen* g_pDisplay; // Pointer to the list screen
+ribanfblib* g_pScreen; // Pointer to the frame buffer object
 
-/**  Handles signal */
+/** @brief  Handles signal
+*   @param  nSignal Signal number
+*/
 void onSignal(int nSignal)
 {
     switch(nSignal)
     {
         case SIGINT:
         case SIGTERM:
-            printf("Received signal to quit...\n");
+            printf("\nReceived signal to quit...\n");
                 g_bRun = false;
             break;
     }
@@ -46,7 +47,7 @@ void copyFile(std::string sSource, std::string sDest)
     int nSrc = open(sSource.c_str(), O_RDONLY, 0);
     if(nSrc == -1)
         return;
-    int nDst = open(sDest.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    int nDst = open(sDest.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR); //!@todo File is created with wrong permissions
     if(nDst == -1)
     {
         close(nSrc);
@@ -67,10 +68,10 @@ void copyFile(std::string sSource, std::string sDest)
     char* pBuffer = (char*)malloc(sizeof(char)*fileStat.st_blksize);
     g_pScreen->DrawRect(0,100, 159,127, WHITE, 1, GREY);
     size_t nSize;
-    while((nSize = read(nSrc, pBuffer, fileStat.st_blksize)) > 0)
+    while(bRun && (nSize = read(nSrc, pBuffer, fileStat.st_blksize)) > 0)
     {
         write(nDst, pBuffer, nSize);
-        // Update progresss bar
+        // Update progress bar
         fX += fDx;
         if(int(fX) > nX)
         {
@@ -78,9 +79,9 @@ void copyFile(std::string sSource, std::string sDest)
             g_pScreen->DrawRect(0,100, nX,127, WHITE, 1, GREEN);
         }
     }
-    free(pBuffer);
-    close(nDst);
+    close(nDst); // There is a delay whilst file is flushed to disk
     close(nSrc);
+    free(pBuffer);
 }
 
 void update(int nMode)
@@ -99,7 +100,9 @@ void update(int nMode)
 
 void onButton(unsigned int nButton)
 {
-    g_nCountdown = 0;
+    g_nCountdown = 0; // Stop countdown
+    g_pScreen->DrawRect(0,100, 159,127, DARK_RED, 1, DARK_RED);
+
     switch(nButton)
     {
         case BUTTON_UP:
@@ -124,20 +127,22 @@ void onButton(unsigned int nButton)
 /** Main application */
 int main(int argc, char** argv)
 {
+    //!@todo Add version info
     cout << "fluidbox manager" << endl;
 
+    // Configure signal handlers
     signal(SIGINT, onSignal);
     signal(SIGTERM, onSignal);
 
-    // Display flash
+    // Display slash screen
     ribanfblib screen("/dev/fb1");
     g_pScreen = & screen;
     screen.LoadBitmap("logo.bmp", "logo");
     screen.DrawBitmap("logo", 0, 0);
 
     // Turn backlight on
-    system("gpio mode 26 pwm");
-    system("gpio pwm 26 900");
+    system("gpio mode GPIO_LED pwm");
+    system("gpio pwm GPIO_LED 900");
 
     // Look for update files
     struct stat fileStat;
@@ -165,7 +170,8 @@ int main(int argc, char** argv)
         buttonHandler.AddButton(BUTTON_DOWN, NULL, onButton);
         buttonHandler.AddButton(BUTTON_LEFT, NULL, onButton);
         buttonHandler.AddButton(BUTTON_RIGHT, NULL, onButton);
-    
+
+        // Countdown progress bar
         screen.DrawRect(0,100, 159,127, WHITE, 1, RED);
         while(g_bRun)
         {
@@ -176,7 +182,8 @@ int main(int argc, char** argv)
                 else
                     g_bRun = false;
             }
-            for(int i = 0; i < 200; ++i)
+            // Delay countdown iteration whilst continuing to scan buttons
+            for(int i = 0; i < 300; ++i)
             {
                 buttonHandler.Process();
                 usleep(10);

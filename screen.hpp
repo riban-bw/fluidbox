@@ -191,6 +191,13 @@ public:
             --m_nSelection;
     }
 
+    void SetEntryText(unsigned int nEntry, string sText)
+    {
+        if(nEntry >= m_vEntries.size())
+            return;
+        m_vEntries[nEntry]->title = sText;
+    }
+
 
 protected:
     ribanfblib* m_pScreen;

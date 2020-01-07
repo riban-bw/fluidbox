@@ -34,7 +34,7 @@
 
 using namespace std;
 
-enum
+enum SCREEN_ID
 {
     SCREEN_NONE,
     SCREEN_PERFORMANCE,
@@ -53,14 +53,14 @@ enum
     SCREEN_EOL
 };
 
-enum
+enum PANIC_MODE
 {
     PANIC_NOTES,
     PANIC_SOUNDS,
     PANIC_RESET
 };
 
-enum
+enum POWER_MODE
 {
     POWER_OFF,
     POWER_OFF_SAVE,
@@ -68,7 +68,7 @@ enum
     POWER_REBOOT_SAVE
 };
 
-enum
+enum REVERB_PARAM
 {
     REVERB_ENABLE,
     REVERB_ROOMSIZE,
@@ -77,7 +77,7 @@ enum
     REVERB_LEVEL
 };
 
-enum
+enum CHORUS_PARAM
 {
     CHORUS_ENABLE,
     CHORUS_VOICES,
@@ -87,6 +87,7 @@ enum
     CHORUS_TYPE
 };
 
+/** MIDI program parameters */
 struct Program
 {
     string name = "New program";
@@ -96,6 +97,7 @@ struct Program
     unsigned int balance = 63;
 };
 
+/** Reverb parameters */
 struct Reverb
 {
     bool enable = false;
@@ -105,6 +107,7 @@ struct Reverb
     double level = 0;
 };
 
+/** Chorus parameters */
 struct Chorus
 {
     bool enable = false;
@@ -115,6 +118,7 @@ struct Chorus
     int type = 0;
 };
 
+/** Parameters used by presets */
 struct Preset
 {
     string name = "New preset";
@@ -313,6 +317,12 @@ void editReverb(unsigned int nParam)
     switch(nParam)
     {
     case REVERB_ENABLE:
+        bool bEnabled = !g_vPresets[g_nCurrentPreset]->reverb.enable);
+        for(unsigned int nIndex = 1; nIndex < 5; ++nIndex)
+            g_mapScreens[SCREEN_EFFECTS]->Enable(bEnabled);
+        g_pSynth->fluid_synth_set_reverb_on(g_pSynth, bEnabled);
+        g_mapScreens[SCREEN_EFFECTS]->SetEntryText(0, "Reverb " + bEnabled?"enabled":"disabled");
+        break;
     case REVERB_ROOMSIZE:
     case REVERB_DAMPING:
     case REVERB_WIDTH:
@@ -323,6 +333,21 @@ void editReverb(unsigned int nParam)
 
 void editChorus(unsigned int nParam)
 {
+    switch(nParam)
+    {
+    case CHORUS_ENABLE:
+        bool bEnabled = !g_vPresets[g_nCurrentPreset]->chorus.enable);
+        for(unsigned int nIndex = 7; nIndex < 12; ++nIndex)
+            g_mapScreens[SCREEN_EFFECTS]->Enable(bEnabled);
+        g_pSynth->fluid_synth_set_chorus_on(g_pSynth, bEnabled);
+        g_mapScreens[SCREEN_EFFECTS]->SetEntryText(0, "Chorus " + bEnabled?"enabled":"disabled");
+        break;
+    case CHORUS_VOICES:
+    case CHORUS_LEVEL:
+    case CHORUS_SPEED:
+    case CHORUS_DEPTH:
+    case CHORUS_TYPE:
+        break;
 }
 
 /**  Shows the edit program screen */

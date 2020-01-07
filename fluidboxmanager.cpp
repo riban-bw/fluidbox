@@ -69,7 +69,7 @@ void copyFile(std::string sSource, std::string sDest)
     char* pBuffer = (char*)malloc(sizeof(char)*fileStat.st_blksize);
     g_pScreen->DrawRect(0,100, 159,127, WHITE, 1, GREY);
     size_t nSize;
-    while(bRun && (nSize = read(nSrc, pBuffer, fileStat.st_blksize)) > 0)
+    while(g_bRun && (nSize = read(nSrc, pBuffer, fileStat.st_blksize)) > 0)
     {
         write(nDst, pBuffer, nSize);
         // Update progress bar

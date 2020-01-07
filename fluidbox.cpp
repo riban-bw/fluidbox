@@ -330,7 +330,9 @@ void editEffect(unsigned int nParam)
             for(unsigned int nIndex = 1; nIndex < 5; ++nIndex)
                 g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, bEnabled);
             fluid_synth_set_reverb_on(g_pSynth, bEnabled);
-            g_mapScreens[SCREEN_EFFECTS]->SetEntryText(REVERB_ENABLE, "Reverb " + bEnabled?"enabled":"disabled");
+            string sText = "Reverb ";
+            sText += bEnabled?"enabled":"disabled";
+            g_mapScreens[SCREEN_EFFECTS]->SetEntryText(REVERB_ENABLE, sText);
             g_mapScreens[SCREEN_EFFECTS]->Draw();
             break;
         }
@@ -343,10 +345,12 @@ void editEffect(unsigned int nParam)
         {
             bool bEnabled = !g_vPresets[g_nCurrentPreset]->chorus.enable;
             g_vPresets[g_nCurrentPreset]->chorus.enable = bEnabled;
-            for(unsigned int nIndex = 7; nIndex < 12; ++nIndex)
+            for(unsigned int nIndex = 6; nIndex < 12; ++nIndex)
                 g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, bEnabled);
             fluid_synth_set_chorus_on(g_pSynth, bEnabled);
-            g_mapScreens[SCREEN_EFFECTS]->SetEntryText(CHORUS_ENABLE, "Chorus " + bEnabled?"enabled":"disabled");
+            string sText = "Chorus ";
+            sText += bEnabled?"enabled":"disabled";
+            g_mapScreens[SCREEN_EFFECTS]->SetEntryText(CHORUS_ENABLE, sText);
                 g_mapScreens[SCREEN_EFFECTS]->Draw();
             break;
         }

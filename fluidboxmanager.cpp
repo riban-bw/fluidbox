@@ -69,7 +69,7 @@ void copyFile(std::string sSource, std::string sDest)
     char* pBuffer = (char*)malloc(sizeof(char)*fileStat.st_blksize);
     g_pScreen->DrawRect(0,100, 159,127, WHITE, 1, GREY);
     size_t nSize;
-    while(g_bRun && (nSize = read(nSrc, pBuffer, fileStat.st_blksize)) > 0)
+    while(g_bRun && ((nSize = read(nSrc, pBuffer, fileStat.st_blksize)) > 0))
     {
         write(nDst, pBuffer, nSize);
         // Update progress bar
@@ -101,9 +101,11 @@ void update(int nMode)
 
 void onButton(unsigned int nButton)
 {
-    g_nCountdown = 0; // Stop countdown
-    g_pScreen->DrawRect(0,100, 159,127, DARK_RED, 1, DARK_RED);
-
+    if(g_nCountdown)
+    {
+        g_nCountdown = 0; // Stop countdown
+        g_pScreen->DrawRect(0,100, 159,127, DARK_RED, 1, DARK_RED);
+    }
     switch(nButton)
     {
     case BUTTON_UP:
@@ -192,6 +194,7 @@ int main(int argc, char** argv)
         }
     }
 
+    //!@todo Should we delete framebuffer before opening app?
     cout << "Launching fluidbox..." << endl;
     system("./fluidbox");
 

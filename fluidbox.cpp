@@ -621,8 +621,9 @@ void drawMixerChannel(unsigned int nChannel, int nLevel = -1)
 */
 void drawPresetName()
 {
-    g_pScreen->DrawRect(0, 50, 127, 70, WHITE, 1, BLACK);
-    g_pScreen->DrawText(g_vPresets[g_nCurrentPreset]->name, 10, 68);
+    g_pScreen->DrawRect(0, 50, 159, 70, BLACK, 0, BLACK);
+    g_pScreen->DrawText(g_vPresets[g_nCurrentPreset]->name, 8, 68);
+    g_pScreen->DrawRect(8 + g_nCurrentChar * 7, 69, 14 + g_nCurrentChar * 7, 70, BLACK, 0, GREEN);
 }
 
 /** Display the requested screen
@@ -1104,6 +1105,7 @@ int main(int argc, char** argv)
     printf("riban fluidbox\n");
     g_pScreen = new ribanfblib("/dev/fb1");
     g_pScreen->LoadBitmap("logo.bmp", "logo");
+    g_pScreen->SetFont(16, 12, "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf");
     showScreen(SCREEN_LOGO);
 
     system("gpio mode 26 pwm");

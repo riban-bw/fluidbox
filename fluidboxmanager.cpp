@@ -144,8 +144,8 @@ int main(int argc, char** argv)
     g_pScreen->Clear();
 
     // Turn backlight on
-    system("gpio mode GPIO_LED pwm");
-    system("gpio pwm GPIO_LED 900");
+    system("gpio mode 26 pwm");
+    system("gpio pwm 26 900");
 
     // Look for update files
     struct stat fileStat;

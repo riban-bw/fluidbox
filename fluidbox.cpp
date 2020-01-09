@@ -314,16 +314,6 @@ void power(unsigned int nAction)
     system(sCommand.c_str());
 }
 
-void editValue(unsigned int nParam)
-{
-    //!@todo Implement editValue
-    switch(nParam)
-    {
-    case REVERB_ROOMSIZE:
-        break;
-    }
-}
-
 void drawEffectValue(unsigned int nEffect, unsigned int nValue)
 {
     if(g_nCurrentScreen != SCREEN_EDIT_VALUE)
@@ -344,10 +334,12 @@ void drawEffectValue(unsigned int nEffect, unsigned int nValue)
 */
 void adjustEffect(unsigned int nEffect, bool bIncrease)
 {
+    double dValue;
+    int nValue;
     switch(nEffect)
     {
     case REVERB_DAMPING:
-        double dValue = fluid_synth_get_reverb_damp(g_pSynth);
+        dValue = fluid_synth_get_reverb_damp(g_pSynth);
         if(bIncrease)
         {
             if(dValue <= 0.9)
@@ -363,10 +355,10 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
                 fluid_synth_set_reverb_damp(g_pSynth, 0.0);
         }
         drawEffectValue(nEffect, dValue * 100);
-        g_pScreen->DrawText(to_string(nValue), 20, 32);
+        g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case REVERB_LEVEL:
-        double dValue = fluid_synth_get_reverb_level(g_pSynth);
+        dValue = fluid_synth_get_reverb_level(g_pSynth);
         if(bIncrease)
         {
             if(dValue <= 0.9)
@@ -382,10 +374,10 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
                 fluid_synth_set_reverb_level(g_pSynth, 0.0);
         }
         drawEffectValue(nEffect, dValue * 100);
-        g_pScreen->DrawText(to_string(nValue), 20, 32);
+        g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case REVERB_ROOMSIZE:
-        double dValue = fluid_synth_get_reverb_roomsize(g_pSynth);
+        dValue = fluid_synth_get_reverb_roomsize(g_pSynth);
         if(bIncrease)
         {
             if(dValue <= 1.1)
@@ -401,10 +393,10 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
                 fluid_synth_set_reverb_roomsize(g_pSynth, 0.0);
         }
         drawEffectValue(nEffect, dValue * 83);
-        g_pScreen->DrawText(to_string(nValue), 20, 32);
+        g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case REVERB_WIDTH:
-        double dValue = fluid_synth_get_reverb_width(g_pSynth);
+        dValue = fluid_synth_get_reverb_width(g_pSynth);
         if(bIncrease)
         {
             if(dValue <= 99.0)
@@ -420,10 +412,10 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
                 fluid_synth_set_reverb_width(g_pSynth, 0.0);
         }
         drawEffectValue(nEffect, dValue * 1);
-        g_pScreen->DrawText(to_string(nValue), 20, 32);
+        g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case CHORUS_DEPTH:
-        double dValue = fluid_synth_get_chorus_depth(g_pSynth);
+        dValue = fluid_synth_get_chorus_depth(g_pSynth);
         if(bIncrease)
         {
             if(dValue <= 20.0)
@@ -439,10 +431,10 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
                 fluid_synth_set_chorus_depth(g_pSynth, 0.0);
         }
         drawEffectValue(nEffect, dValue * 5);
-        g_pScreen->DrawText(to_string(nValue), 20, 32);
+        g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case CHORUS_LEVEL:
-        double dValue = fluid_synth_get_chorus_level(g_pSynth);
+        dValue = fluid_synth_get_chorus_level(g_pSynth);
         if(bIncrease)
         {
             if(dValue <= 9.0)
@@ -458,10 +450,10 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
                 fluid_synth_set_chorus_level(g_pSynth, 0.0);
         }
         drawEffectValue(nEffect, dValue * 10);
-        g_pScreen->DrawText(to_string(nValue), 20, 32);
+        g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case CHORUS_SPEED:
-        double dValue = fluid_synth_get_chorus_speed(g_pSynth);
+        dValue = fluid_synth_get_chorus_speed(g_pSynth);
         if(bIncrease)
         {
             if(dValue <= 4.9)
@@ -472,19 +464,18 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
         else
         {
             if(dValue >= 0.2)
-                fluid_synth_set_chorus_speed(g_pSynth, dValue - 0.1;
+                fluid_synth_set_chorus_speed(g_pSynth, dValue - 0.1);
             else
                 fluid_synth_set_chorus_speed(g_pSynth, 0.1);
         }
         drawEffectValue(nEffect, dValue * 20);
-        g_pScreen->DrawText(to_string(nValue), 20, 32);
+        g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case CHORUS_TYPE:
         //!@todo Validate chorus type range
-        int nValue = fluid_synth_get_chorus_type(g_pSynth);
+        nValue = fluid_synth_get_chorus_type(g_pSynth);
         if(bIncrease)
         {
-            fluid_chorus_
             if(nValue <= 1)
                 fluid_synth_set_chorus_type(g_pSynth, nValue + 1);
             else
@@ -493,7 +484,7 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
         else
         {
             if(nValue >= 1)
-                fluid_synth_set_chorus_type(g_pSynth, nValue - 1;
+                fluid_synth_set_chorus_type(g_pSynth, nValue - 1);
             else
                 fluid_synth_set_chorus_type(g_pSynth, 0);
         }
@@ -502,10 +493,9 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
         break;
     case CHORUS_VOICES:
         //!@todo Validate chorus type range
-        int nValue = fluid_synth_get_chorus_nr(g_pSynth);
+        nValue = fluid_synth_get_chorus_nr(g_pSynth);
         if(bIncrease)
         {
-            fluid_chorus_
             if(nValue <= 98)
                 fluid_synth_set_chorus_nr(g_pSynth, nValue + 1);
             else
@@ -514,7 +504,7 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
         else
         {
             if(nValue >= 1)
-                fluid_synth_set_chorus_nr(g_pSynth, nValue - 1;
+                fluid_synth_set_chorus_nr(g_pSynth, nValue - 1);
             else
                 fluid_synth_set_chorus_nr(g_pSynth, 0);
         }
@@ -614,16 +604,17 @@ void drawMixerChannel(unsigned int nChannel, int nLevel = -1)
 {
     if(g_nCurrentScreen != SCREEN_MIXER || nChannel > 15)
         return;
-    if(nLevel < 0 || FLUID__FAILED == fluid_synth_get_cc(g_pSynth, nChannel, 7, &nLevel))
+    if(nLevel < 0 && (FLUID_FAILED == fluid_synth_get_cc(g_pSynth, nChannel, 7, &nLevel)))
         return;
     if(nLevel > 127)
         nLevel = 127;
     if(nLevel < 0)
         nLevel = 0;
     nLevel = (nLevel * 100) / 127;
-    g_pScreen->DrawRect(nChannel * 10, 126-100, nChannel * 10 + 9, 127, (g_nSelectedChannel==nChannel)?GREEN:WHITE, 1, BLACK);
-    g_pScreen->DrawRect(nChannel * 10 + 1, 126, nChannel * 10 + 8, 127 - nLevel, DARK_GREEN, 0, DARK_GREEN);
-    g_pScreen->DrawText(to_string(nChannel), nChannel * 10 + 1, 127);
+    g_pScreen->DrawRect(nChannel * 10, 20, nChannel * 10 + 10, 127, BLACK, 1, BLACK);
+    g_pScreen->DrawRect(nChannel * 10 + 1, 120, nChannel * 10 + 8, 120 - nLevel, DARK_GREEN, 0, DARK_GREEN);
+    g_pScreen->DrawRect(0,127, 159,121, BLACK, 0, BLACK);
+    g_pScreen->DrawRect(nChannel * 10, 124, nChannel * 10 + 10,121, RED, 0, RED);
 }
 
 /** Draw preset name screen
@@ -631,11 +622,7 @@ void drawMixerChannel(unsigned int nChannel, int nLevel = -1)
 void drawPresetName()
 {
     g_pScreen->DrawRect(0, 50, 127, 70, WHITE, 1, BLACK);
-    for(unsigned int nIndex = 0; nIndex < g_vPresets[g_nCurrentPreset]->name.length(); ++nIndex)
-    {
-        g_pScreen->DrawRect(nIndex * 16 + 2, 50, nIndex * 16 + 15, 70, WHITE, 1, g_nCurrentChar==nIndex?DARK_GREEN:BLACK);
-        g_pScreen->DrawText(g_vPresets[g_nCurrentPreset]->name[nIndex]);
-    }
+    g_pScreen->DrawText(g_vPresets[g_nCurrentPreset]->name, 10, 68);
 }
 
 /** Display the requested screen
@@ -668,6 +655,8 @@ void showScreen(int nScreen)
     {
         drawPresetName();
     }
+    else if(nScreen == SCREEN_EDIT_VALUE)
+        drawEffectValue(g_nCurrentEffect, -1);
 }
 
 void save(int)
@@ -684,7 +673,7 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
     int nType = fluid_midi_event_get_type(pEvent);
     switch(nType)
     {
-    case fluid_midi_event_type::PROGRAM_CHANGE:
+    case 0xC0: //PROGRAM_CHANGE
     {
         int nProgram = fluid_midi_event_get_program(pEvent);
         g_vPresets[g_nCurrentPreset]->program[nChannel].program = nProgram;
@@ -693,17 +682,17 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
             showEditProgram();
         break;
     }
-    case fluid_midi_event_type::NOTE_OFF:
+    case 0x80: //NOTE_OFF
         if(g_nNoteCount[nChannel] > 0)
             g_nNoteCount[nChannel]--;
         showMidiActivity(nChannel);
         break;
-    case fluid_midi_event_type::NOTE_ON:
+    case 0x90: //NOTE_ON
         g_nNoteCount[nChannel]++;
         showMidiActivity(nChannel);
         break;
-    case fluid_midi_event_type::CONTROL_CHANGE:
-        if(fluid_midi_event_get_control(pEvent) == fluid_midi_control_change::VOLUME_MSB)
+    case 0xB0: //CONTROL_CHANGE
+        if(fluid_midi_event_get_control(pEvent) == 7)
             drawMixerChannel(nChannel, fluid_midi_event_get_value(pEvent));
         break;
     default:
@@ -955,11 +944,8 @@ void onNavigate(unsigned int nButton)
         case BUTTON_LEFT:
             if(g_nCurrentChannel)
                 drawMixerChannel(--g_nCurrentChannel);
-            else:
-            {
-                g_nCurrentScreen = mapScreens[g_nCurrentScreen]->GetParent();
+            else
                 showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
-            }
             break;
         case BUTTON_RIGHT:
             if(g_nCurrentChannel < 15)
@@ -970,22 +956,22 @@ void onNavigate(unsigned int nButton)
         case BUTTON_UP:
             {
                 int nLevel;
-                if(FLUID__FAILED == fluid_synth_get_cc(g_pSynth, g_nCurrentChannel, fluid_midi_control_change::VOLUME_MSB, &nLevel)
+                if(FLUID_FAILED == fluid_synth_get_cc(g_pSynth, g_nCurrentChannel, 7, &nLevel))
                     return;
                 if(nLevel >= 127)
                     return;
-                fluid_synth_cc(g_pSynth, g_nCurrentChannel, fluid_midi_control_change::VOLUME_MSB, ++nLevel);
+                fluid_synth_cc(g_pSynth, g_nCurrentChannel, 7, ++nLevel);
                 drawMixerChannel(g_nCurrentChannel, nLevel);
                 break;
             }
         case BUTTON_DOWN:
             {
                 int nLevel;
-                if(FLUID__FAILED == fluid_synth_get_cc(g_pSynth, g_nCurrentChannel, fluid_midi_control_change::VOLUME_MSB, &nLevel)
+                if(FLUID_FAILED == fluid_synth_get_cc(g_pSynth, g_nCurrentChannel, 7, &nLevel))
                     return;
                 if(nLevel < 1)
                     return;
-                fluid_synth_cc(g_pSynth, g_nCurrentChannel, fluid_midi_control_change::VOLUME_MSB, --nLevel);
+                fluid_synth_cc(g_pSynth, g_nCurrentChannel, 7, --nLevel);
                 drawMixerChannel(g_nCurrentChannel, nLevel);
                 break;
             }
@@ -996,21 +982,21 @@ void onNavigate(unsigned int nButton)
         {
         case BUTTON_UP:
             {
-                char c = _vPresets[g_nCurrentPreset]->name[g_nCurrentChar];
+                char c = g_vPresets[g_nCurrentPreset]->name[g_nCurrentChar];
                 if(++c < 32 || c > 126)
                     c = 32;
-                vPresets[g_nCurrentPreset]->name[g_nCurrentChar] = c;
-                vPresets[g_nCurrentPreset]->dirty = true;
+                g_vPresets[g_nCurrentPreset]->name[g_nCurrentChar] = c;
+                g_vPresets[g_nCurrentPreset]->dirty = true;
                 drawPresetName();
                 break;
             }
         case BUTTON_DOWN:
             {
-                char c = _vPresets[g_nCurrentPreset]->name[g_nCurrentChar];
+                char c = g_vPresets[g_nCurrentPreset]->name[g_nCurrentChar];
                 if(--c < 32 || c > 126)
                     c = 126;
-                vPresets[g_nCurrentPreset]->name[g_nCurrentChar] = c;
-                vPresets[g_nCurrentPreset]->dirty = true;
+                g_vPresets[g_nCurrentPreset]->name[g_nCurrentChar] = c;
+                g_vPresets[g_nCurrentPreset]->dirty = true;
                 drawPresetName();
                 break;
             }
@@ -1034,14 +1020,14 @@ void onNavigate(unsigned int nButton)
         switch(nButton)
         {
         case BUTTON_DOWN:
-            adjustEffect(g_nCurrentEffect, -1);
+            adjustEffect(g_nCurrentEffect, false);
             break;
         case BUTTON_UP:
-            adjustEffect(g_nCurrentEffect, 1);
+            adjustEffect(g_nCurrentEffect, true);
             break;
         case BUTTON_LEFT:
         case BUTTON_RIGHT:
-            showScreen(g_mapScreens[nScreen]->GetPreviousScreen());
+            showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
             break;
         }
         break;

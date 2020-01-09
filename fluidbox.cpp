@@ -143,6 +143,7 @@ unsigned char debouncePin[32]; // Debounce streams for each GPIO pin
 
 map<unsigned int,ListScreen*> g_mapScreens; // Map of screens indexed by id
 unsigned int g_nCurrentScreen; // Id of currently displayed screen
+unsigned int g_nCurrentChannel = 0; // Selected channel, e.g. within mixer screen
 
 
 /**     Return a converted and vaildated value
@@ -400,6 +401,26 @@ void showMidiActivity(int nChannel)
         g_pScreen->DrawRect(0,nY+15, 1,nY+15-nCount, RED, 0, RED); // Draw indicator
 }
 
+/** Draw a mixer channel
+*   @param  nChannel MIDI channel [0-15]
+*   @param  nValue MIDI CC7 value to display [0-127] Default: -1: Get value from synth
+*/
+void drawMixerChannel(unsigned int nChannel, int nLevel = -1)
+{
+    if(g_nCurrentScreen != SCREEN_MIXER || nChannel > 15)
+        return;
+    if(nLevel < 0 || FLUID__FAILED == fluid_synth_get_cc(g_pSynth, nChannel, 7, &nLevel)
+        return;
+    if(nLevel > 127)
+        nLevel = 127;
+    if(nLevel < 0)
+        nLevel = 0;
+    nLevel = (nLevel * 100) / 127;
+    g_pScreen->DrawRect(nChannel * 10, 126-100, nChannel * 10 + 9, 127, g_nSelectedChannel==nChannel?GREEN:WHITE, 1, BLACK);
+    g_pScreen->DrawRect(nChannel * 10 + 1, 126, nChannel * 10 + 8, 127 - nLevel, DARK_GREEN, 0, DARK_GREEN);
+    g_pScreen->DrawText(to_string(nChannel), nChannel * 10 + 1, 127);
+}
+
 /** Display the requested screen
     @param pScreen Pointer to the screen to display
 */
@@ -421,6 +442,11 @@ void showScreen(int nScreen)
     it->second->Draw();
     it->second->SetPreviousScreen(g_nCurrentScreen);
     g_nCurrentScreen = nScreen;
+    if(nScreen == SCREEN_MIXER)
+    {
+        for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
+            drawMixerChannel(nChannel);
+    }
 }
 
 void save(int)
@@ -437,7 +463,7 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
     int nType = fluid_midi_event_get_type(pEvent);
     switch(nType)
     {
-    case 0xC0: // Program change
+    case fluid_midi_event_type::PROGRAM_CHANGE:
     {
         int nProgram = fluid_midi_event_get_program(pEvent);
         g_vPresets[g_nCurrentPreset]->program[nChannel].program = nProgram;
@@ -446,17 +472,21 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
             showEditProgram();
         break;
     }
-    case 0x80: // Note off
+    case fluid_midi_event_type::NOTE_OFF:
         if(g_nNoteCount[nChannel] > 0)
             g_nNoteCount[nChannel]--;
         showMidiActivity(nChannel);
         break;
-    case 0x90: // Note on
+    case fluid_midi_event_type::NOTE_ON:
         g_nNoteCount[nChannel]++;
         showMidiActivity(nChannel);
         break;
+    case fluid_midi_event_type::CONTROL_CHANGE:
+        if(fluid_midi_event_get_control(pEvent) == fluid_midi_control_change::VOLUME_MSB)
+            drawMixerChannel(nChannel, fluid_midi_event_get_value(pEvent));
+        break;
     default:
-        printf("event type: 0x%02x\n", nType);
+        printf("Unhandled MIDI event type: 0x%02x\n", nType);
     }
     return 0;
 }
@@ -698,6 +728,47 @@ void onNavigate(unsigned int nButton)
     case SCREEN_BLANK:
         showScreen(SCREEN_PERFORMANCE);
         break;
+    case SCREEN_MIXER:
+        switch(nButton)
+        {
+        case BUTTON_LEFT:
+            if(g_nCurrentChannel)
+                drawMixerChannel(--g_nCurrentChannel);
+            else:
+            {
+                g_nCurrentScreen = mapScreens[g_nCurrentScreen]->GetParent();
+                showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
+            }
+            break;
+        case BUTTON_RIGHT:
+            if(g_nCurrentChannel < 15)
+                drawMixerChannel(++g_nCurrentChannel);
+            else
+                g_nCurrentChannel = 15;
+            break;
+        case BUTTON_UP:
+            {
+                int nLevel;
+                if(FLUID__FAILED == fluid_synth_get_cc(g_pSynth, g_nCurrentChannel, fluid_midi_control_change::VOLUME_MSB, &nLevel)
+                    return;
+                if(nLevel >= 127)
+                    return;
+                fluid_synth_cc(g_pSynth, g_nCurrentChannel, fluid_midi_control_change::VOLUME_MSB, ++nLevel);
+                drawMixerChannel(g_nCurrentChannel, nLevel);
+                break;
+            }
+        case BUTTON_DOWN:
+            {
+                int nLevel;
+                if(FLUID__FAILED == fluid_synth_get_cc(g_pSynth, g_nCurrentChannel, fluid_midi_control_change::VOLUME_MSB, &nLevel)
+                    return;
+                if(nLevel < 1)
+                    return;
+                fluid_synth_cc(g_pSynth, g_nCurrentChannel, fluid_midi_control_change::VOLUME_MSB, --nLevel);
+                drawMixerChannel(g_nCurrentChannel, nLevel);
+                break;
+            }
+        }
     default:
         switch(nButton)
         {

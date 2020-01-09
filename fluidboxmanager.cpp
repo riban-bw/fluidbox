@@ -16,7 +16,8 @@
 #define GPIO_LED      26
 using namespace std;
 
-enum
+/** Identifies the type of update to perform */
+enum UPDATE_TYPE
 {
     UPDATE_FLUIDBOX,
     UPDATE_SOUNDFONT,
@@ -24,7 +25,7 @@ enum
 };
 
 bool g_bRun = true; // True whilst in program loop
-unsigned int g_nCountdown = 159; // Used to draw countdown progress bar
+unsigned int g_nCountdown = 159; // Used to draw countdown progress bar (width of screen)
 ListScreen* g_pDisplay; // Pointer to the list screen
 ribanfblib* g_pScreen; // Pointer to the frame buffer object
 
@@ -137,11 +138,10 @@ int main(int argc, char** argv)
     signal(SIGINT, onSignal);
     signal(SIGTERM, onSignal);
 
-    // Display slash screen
+    // Initalise screen
     ribanfblib screen("/dev/fb1");
     g_pScreen = & screen;
-    screen.LoadBitmap("logo.bmp", "logo");
-    screen.DrawBitmap("logo", 0, 0);
+    g_pScreen->Clear();
 
     // Turn backlight on
     system("gpio mode GPIO_LED pwm");

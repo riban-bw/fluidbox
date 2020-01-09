@@ -47,6 +47,336 @@
 		<Unit filename="buttonhandler.hpp" />
 		<Unit filename="fluidbox.cpp" />
 		<Unit filename="fluidboxmanager.cpp" />
+		<Unit filename="fluidsynth/build/CMakeFiles/3.14.5/CompilerIdC/CMakeCCompilerId.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/build/CMakeFiles/CheckIncludeFiles/HAVE_UNISTD_H.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/build/CMakeFiles/CheckIncludeFiles/StandardHeadersExist.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/build/CMakeFiles/CheckTypeSize/CMAKE_SIZEOF_UNSIGNED_SHORT.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/build/CMakeFiles/FindOpenMP/OpenMPCheckVersion.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/build/CMakeFiles/FindOpenMP/OpenMPTryFlag.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/build/CMakeFiles/feature_tests.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/build/config.h" />
+		<Unit filename="fluidsynth/build/include/fluidsynth.h" />
+		<Unit filename="fluidsynth/build/include/fluidsynth/version.h" />
+		<Unit filename="fluidsynth/cmake_admin/VersionResource.rc">
+			<Option compilerVar="WINDRES" />
+		</Unit>
+		<Unit filename="fluidsynth/doc/android/fluidsynth-assetloader/fluid_androidasset.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/doc/android/fluidsynth-assetloader/fluid_androidasset.h" />
+		<Unit filename="fluidsynth/doc/example.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/doc/fluidsynth_arpeggio.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/doc/fluidsynth_fx.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/doc/fluidsynth_metronome.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/doc/fluidsynth_process.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/doc/fluidsynth_register_adriver.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/doc/fluidsynth_sfload_mem.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/doc/fluidsynth_simple.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/include/fluidsynth/audio.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/event.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/gen.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/ladspa.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/log.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/midi.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/misc.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/mod.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/seq.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/seqbind.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/settings.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/sfont.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/shell.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/synth.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/types.h" />
+		<Unit filename="fluidsynth/include/fluidsynth/voice.h" />
+		<Unit filename="fluidsynth/src/bindings/fluid_cmd.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/bindings/fluid_cmd.h" />
+		<Unit filename="fluidsynth/src/bindings/fluid_filerenderer.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/bindings/fluid_ladspa.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/bindings/fluid_ladspa.h" />
+		<Unit filename="fluidsynth/src/bindings/fluid_lash.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/bindings/fluid_lash.h" />
+		<Unit filename="fluidsynth/src/bindings/fluid_rtkit.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/bindings/fluid_rtkit.h" />
+		<Unit filename="fluidsynth/src/drivers/fluid_adriver.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_adriver.h" />
+		<Unit filename="fluidsynth/src/drivers/fluid_alsa.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_aufile.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_coreaudio.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_coremidi.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_dart.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_dsound.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_jack.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_mdriver.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_mdriver.h" />
+		<Unit filename="fluidsynth/src/drivers/fluid_midishare.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_oboe.cpp" />
+		<Unit filename="fluidsynth/src/drivers/fluid_opensles.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_oss.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_portaudio.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_pulse.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_sdl2.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_sndmgr.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_waveout.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/drivers/fluid_winmidi.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/fluidsynth.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/gentables/gen_conv.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/gentables/gen_rvoice_dsp.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/gentables/make_tables.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/gentables/make_tables.h" />
+		<Unit filename="fluidsynth/src/midi/fluid_midi.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/midi/fluid_midi.h" />
+		<Unit filename="fluidsynth/src/midi/fluid_midi_router.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/midi/fluid_midi_router.h" />
+		<Unit filename="fluidsynth/src/midi/fluid_seq.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/midi/fluid_seqbind.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/rvoice/fluid_adsr_env.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/rvoice/fluid_adsr_env.h" />
+		<Unit filename="fluidsynth/src/rvoice/fluid_chorus.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/rvoice/fluid_chorus.h" />
+		<Unit filename="fluidsynth/src/rvoice/fluid_iir_filter.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/rvoice/fluid_iir_filter.h" />
+		<Unit filename="fluidsynth/src/rvoice/fluid_lfo.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/rvoice/fluid_lfo.h" />
+		<Unit filename="fluidsynth/src/rvoice/fluid_phase.h" />
+		<Unit filename="fluidsynth/src/rvoice/fluid_rev.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/rvoice/fluid_rev.h" />
+		<Unit filename="fluidsynth/src/rvoice/fluid_rvoice.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/rvoice/fluid_rvoice.h" />
+		<Unit filename="fluidsynth/src/rvoice/fluid_rvoice_dsp.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/rvoice/fluid_rvoice_dsp_tables.h" />
+		<Unit filename="fluidsynth/src/rvoice/fluid_rvoice_event.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/rvoice/fluid_rvoice_event.h" />
+		<Unit filename="fluidsynth/src/rvoice/fluid_rvoice_mixer.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/rvoice/fluid_rvoice_mixer.h" />
+		<Unit filename="fluidsynth/src/sfloader/fluid_defsfont.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/sfloader/fluid_defsfont.h" />
+		<Unit filename="fluidsynth/src/sfloader/fluid_instpatch.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/sfloader/fluid_instpatch.h" />
+		<Unit filename="fluidsynth/src/sfloader/fluid_samplecache.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/sfloader/fluid_samplecache.h" />
+		<Unit filename="fluidsynth/src/sfloader/fluid_sffile.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/sfloader/fluid_sffile.h" />
+		<Unit filename="fluidsynth/src/sfloader/fluid_sfont.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/sfloader/fluid_sfont.h" />
+		<Unit filename="fluidsynth/src/synth/fluid_chan.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/synth/fluid_chan.h" />
+		<Unit filename="fluidsynth/src/synth/fluid_event.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/synth/fluid_event.h" />
+		<Unit filename="fluidsynth/src/synth/fluid_gen.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/synth/fluid_gen.h" />
+		<Unit filename="fluidsynth/src/synth/fluid_mod.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/synth/fluid_mod.h" />
+		<Unit filename="fluidsynth/src/synth/fluid_synth.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/synth/fluid_synth.h" />
+		<Unit filename="fluidsynth/src/synth/fluid_synth_monopoly.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/synth/fluid_tuning.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/synth/fluid_tuning.h" />
+		<Unit filename="fluidsynth/src/synth/fluid_voice.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/synth/fluid_voice.h" />
+		<Unit filename="fluidsynth/src/utils/fluid_conv.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/utils/fluid_conv.h" />
+		<Unit filename="fluidsynth/src/utils/fluid_conv_tables.h" />
+		<Unit filename="fluidsynth/src/utils/fluid_hash.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/utils/fluid_hash.h" />
+		<Unit filename="fluidsynth/src/utils/fluid_list.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/utils/fluid_list.h" />
+		<Unit filename="fluidsynth/src/utils/fluid_ringbuffer.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/utils/fluid_ringbuffer.h" />
+		<Unit filename="fluidsynth/src/utils/fluid_settings.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/utils/fluid_settings.h" />
+		<Unit filename="fluidsynth/src/utils/fluid_sys.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/src/utils/fluid_sys.h" />
+		<Unit filename="fluidsynth/src/utils/fluidsynth_priv.h" />
+		<Unit filename="fluidsynth/test/test.h" />
+		<Unit filename="fluidsynth/test/test_ct2hz.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/test/test_pointer_alignment.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/test/test_preset_sample_loading.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/test/test_sample_cache.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/test/test_sample_rate_change.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/test/test_seq_event_queue_sort.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/test/test_seq_scale.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/test/test_seqbind_unregister.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/test/test_sf3_sfont_loading.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/test/test_sfont_loading.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/test/test_snprintf.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/test/test_synth_chorus_reverb.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="fluidsynth/test/test_synth_process.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="ribanfblib/bitmap/bitmap_image.hpp" />
+		<Unit filename="ribanfblib/bitmap/bitmap_test.cpp" />
 		<Unit filename="ribanfblib/colours.h" />
 		<Unit filename="ribanfblib/ribanfblib.cpp" />
 		<Unit filename="ribanfblib/ribanfblib.h" />

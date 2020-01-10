@@ -330,9 +330,9 @@ void drawEffectValue(unsigned int nEffect, unsigned int nValue)
 
 /** Alters the value of an effect parameter
 *   @param  nEffect Index of the effect parameter to alter
-*   @param  bIncrease True to increase value of effect parameter. False to decrease.
+*   @param  nChange Amount to change value [-1, 0, +1]
 */
-void adjustEffect(unsigned int nEffect, bool bIncrease)
+void adjustEffect(unsigned int nEffect, int nChange)
 {
     double dValue;
     int nValue;
@@ -340,14 +340,14 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
     {
     case REVERB_DAMPING:
         dValue = fluid_synth_get_reverb_damp(g_pSynth);
-        if(bIncrease)
+        if(nChange > 0)
         {
             if(dValue <= 0.9)
                 fluid_synth_set_reverb_damp(g_pSynth, dValue + 0.1);
             else
                 fluid_synth_set_reverb_damp(g_pSynth, 1.0);
         }
-        else
+        else if(nChange < 0)
         {
             if(dValue >= 0.1)
                 fluid_synth_set_reverb_damp(g_pSynth, dValue - 0.1);
@@ -359,14 +359,14 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
         break;
     case REVERB_LEVEL:
         dValue = fluid_synth_get_reverb_level(g_pSynth);
-        if(bIncrease)
+        if(nChange > 0)
         {
             if(dValue <= 0.9)
                 fluid_synth_set_reverb_level(g_pSynth, dValue + 0.1);
             else
                 fluid_synth_set_reverb_level(g_pSynth, 1.0);
         }
-        else
+        else if(nChange < 0)
         {
             if(dValue >= 0.1)
                 fluid_synth_set_reverb_level(g_pSynth, dValue - 0.1);
@@ -378,11 +378,11 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
         break;
     case REVERB_ROOMSIZE:
         dValue = fluid_synth_get_reverb_roomsize(g_pSynth);
-        if(bIncrease)
+        if(nChange > 0)
         {
             if(dValue <= 1.1)
                 fluid_synth_set_reverb_roomsize(g_pSynth, dValue + 0.1);
-            else
+            else if(nChange < 0)
                 fluid_synth_set_reverb_roomsize(g_pSynth, 1.2);
         }
         else
@@ -397,11 +397,11 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
         break;
     case REVERB_WIDTH:
         dValue = fluid_synth_get_reverb_width(g_pSynth);
-        if(bIncrease)
+        if(nChange > 0)
         {
             if(dValue <= 99.0)
                 fluid_synth_set_reverb_width(g_pSynth, dValue + 1.0);
-            else
+            else if(nChange < 0)
                 fluid_synth_set_reverb_width(g_pSynth, 100.0);
         }
         else
@@ -416,11 +416,11 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
         break;
     case CHORUS_DEPTH:
         dValue = fluid_synth_get_chorus_depth(g_pSynth);
-        if(bIncrease)
+        if(nChange > 0)
         {
             if(dValue <= 20.0)
                 fluid_synth_set_chorus_depth(g_pSynth, dValue + 1.0);
-            else
+            else if(nChange > 0)
                 fluid_synth_set_chorus_depth(g_pSynth, 21.0);
         }
         else
@@ -435,11 +435,11 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
         break;
     case CHORUS_LEVEL:
         dValue = fluid_synth_get_chorus_level(g_pSynth);
-        if(bIncrease)
+        if(nChange > 0)
         {
             if(dValue <= 9.0)
                 fluid_synth_set_chorus_level(g_pSynth, dValue + 1.0);
-            else
+            else if(nChange < 0)
                 fluid_synth_set_chorus_level(g_pSynth, 10.0);
         }
         else
@@ -454,11 +454,11 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
         break;
     case CHORUS_SPEED:
         dValue = fluid_synth_get_chorus_speed(g_pSynth);
-        if(bIncrease)
+        if(nChange > 0)
         {
             if(dValue <= 4.9)
                 fluid_synth_set_chorus_speed(g_pSynth, dValue + 0.1);
-            else
+            else if(nChange < 0)
                 fluid_synth_set_chorus_speed(g_pSynth, 5.0);
         }
         else
@@ -474,11 +474,11 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
     case CHORUS_TYPE:
         //!@todo Validate chorus type range
         nValue = fluid_synth_get_chorus_type(g_pSynth);
-        if(bIncrease)
+        if(nChange > 0)
         {
             if(nValue <= 1)
                 fluid_synth_set_chorus_type(g_pSynth, nValue + 1);
-            else
+            else if(nChange < 0)
                 fluid_synth_set_chorus_type(g_pSynth, 2);
         }
         else
@@ -494,11 +494,11 @@ void adjustEffect(unsigned int nEffect, bool bIncrease)
     case CHORUS_VOICES:
         //!@todo Validate chorus type range
         nValue = fluid_synth_get_chorus_nr(g_pSynth);
-        if(bIncrease)
+        if(nChange > 0)
         {
             if(nValue <= 98)
                 fluid_synth_set_chorus_nr(g_pSynth, nValue + 1);
-            else
+            else if(nChange < 0)
                 fluid_synth_set_chorus_nr(g_pSynth, 99);
         }
         else
@@ -553,8 +553,8 @@ void editEffect(unsigned int nParam)
     case REVERB_DAMPING:
     case REVERB_WIDTH:
     case REVERB_LEVEL:
-        showScreen(SCREEN_EDIT_VALUE);
         g_nCurrentEffect = nParam;
+        showScreen(SCREEN_EDIT_VALUE);
         break;
     }
 }
@@ -657,7 +657,7 @@ void showScreen(int nScreen)
         drawPresetName();
     }
     else if(nScreen == SCREEN_EDIT_VALUE)
-        drawEffectValue(g_nCurrentEffect, -1);
+        adjustEffect(g_nCurrentEffect, 0);
 }
 
 void save(int)
@@ -1021,10 +1021,10 @@ void onNavigate(unsigned int nButton)
         switch(nButton)
         {
         case BUTTON_DOWN:
-            adjustEffect(g_nCurrentEffect, false);
+            adjustEffect(g_nCurrentEffect, -1);
             break;
         case BUTTON_UP:
-            adjustEffect(g_nCurrentEffect, true);
+            adjustEffect(g_nCurrentEffect, 1);
             break;
         case BUTTON_LEFT:
         case BUTTON_RIGHT:

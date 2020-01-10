@@ -614,7 +614,7 @@ void drawMixerChannel(unsigned int nChannel, int nLevel = -1)
     g_pScreen->DrawRect(nChannel * 10, 20, nChannel * 10 + 10, 127, BLACK, 1, BLACK);
     g_pScreen->DrawRect(nChannel * 10 + 1, 120, nChannel * 10 + 8, 120 - nLevel, DARK_GREEN, 0, DARK_GREEN);
     g_pScreen->DrawRect(0,127, 159,121, BLACK, 0, BLACK);
-    g_pScreen->DrawRect(nChannel * 10, 124, nChannel * 10 + 10,121, RED, 0, RED);
+    g_pScreen->DrawRect(g_nCurrentChannel * 10, 124, g_nCurrentChannel * 10 + 10,121, RED, 0, RED);
 }
 
 /** Draw preset name screen

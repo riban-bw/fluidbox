@@ -585,9 +585,9 @@ void drawMixerChannel(unsigned int nChannel, int nLevel = -1)
 */
 void drawPresetName()
 {
-    g_pScreen->DrawRect(0, 50, 159, 70, BLACK, 0, BLACK);
+    g_pScreen->DrawRect(0, 16, 159, 127, BLACK, 0, BLACK);
     g_pScreen->DrawText(g_vPresets[g_nCurrentPreset]->name, 8, 68);
-    g_pScreen->DrawRect(8 + g_nCurrentChar * 7, 69, 14 + g_nCurrentChar * 7, 70, BLACK, 0, GREEN);
+    g_pScreen->DrawRect(7 + g_nCurrentChar * 7, 71, 14 + g_nCurrentChar * 7, 72, BLACK, 0, BLUE);
 }
 
 /** Display the requested screen
@@ -607,7 +607,14 @@ void showScreen(int nScreen)
     if(it == g_mapScreens.end())
         return;
     if(nScreen == SCREEN_PERFORMANCE)
+    {
+        string sName;
+        if(g_vPresets[g_nCurrentPreset]->dirty)
+            sName += "*";
+        sName += g_vPresets[g_nCurrentPreset]->name;
+        g_mapScreens[SCREEN_PERFORMANCE]->SetEntryText(g_nCurrentPreset, sName);
         it->second->SetSelection(g_nCurrentPreset);
+    }
     it->second->Draw();
     it->second->SetPreviousScreen(g_nCurrentScreen);
     g_nCurrentScreen = nScreen;
@@ -795,7 +802,6 @@ bool loadSoundfont(string sFilename)
     if(g_nCurrentSoundfont >= 0)
     {
         g_vPresets[g_nCurrentPreset]->soundfont = sFilename;
-        g_vPresets[g_nCurrentPreset]->dirty = true;
     }
     showScreen(g_nCurrentScreen);
     return (g_nCurrentSoundfont >= 0);

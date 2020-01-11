@@ -220,7 +220,7 @@ int getPresetIndex(Preset* pPreset)
     for(int nIndex = 0; nIndex < g_vPresets.size(); ++nIndex)
     {
         if(g_vPresets[nIndex] == pPreset)
-            return nIndex
+            return nIndex;
     }
     return -1;
 }
@@ -879,42 +879,6 @@ bool loadSoundfont(string sFilename)
     return (g_nCurrentSoundfont >= 0);
 }
 
-/**  Copy a preset
-*    @param pSrc Pointer to the source preset
-*    @param pDst Pointer to the destination preset (NULL to create new preset)
-*    @retval bool True on success
-*/
-bool copyPreset(Preset* pSrc, Preset* pDst= NULL)
-{
-    if(getPresetIndex(pSrc) < 0)
-        return false;
-    if(getPresetIndex(pDst) < 0)
-        pDst = CreatePreset();
-    for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
-    {
-        pDst->program[nChannel].program = pSrc->program[nChannel].program;
-        pDst->program[nChannel].bank = pSrc->program[nChannel].bank;
-        pDst->program[nChannel].level = pSrc->program[nChannel].level;
-        pDst->program[nChannel].balance = pSrc->program[nChannel].balance;
-    }
-
-    pDst->name = pSrc->name;
-    pDst->soundfont = pSrc->soundfont;
-    pDst->reverb.enable = pSrc->reverb.enable;
-    pDst->reverb.roomsize = pSrc->reverb.roomsize;
-    pDst->reverb.damping = pSrc->reverb.damping;
-    pDst->reverb.width = pSrc->reverb.width;
-    pDst->reverb.level = pSrc->reverb.level;
-    pDst->chorus.enable = pSrc->chorus.enable;
-    pDst->chorus.voicecount = pSrc->chorus.voicecount;
-    pDst->chorus.level = pSrc->chorus.level;
-    pDst->chorus.speed = pSrc->chorus.speed;
-    pDst->chorus.depth = pSrc->chorus.depth;
-    pDst->chorus.type = pSrc->chorus.type;
-    setDirty(pPresetDst);
-    return true;
-}
-
 /** Select a preset
 *   @param pPreset Pointer to preset to load
 *   @retval bool True on success
@@ -952,6 +916,42 @@ Preset* CreatePreset()
     g_vPresets.push_back(pPreset);
     refreshPresetList();
     return pPreset;
+}
+
+/**  Copy a preset
+*    @param pSrc Pointer to the source preset
+*    @param pDst Pointer to the destination preset (NULL to create new preset)
+*    @retval bool True on success
+*/
+bool copyPreset(Preset* pSrc, Preset* pDst = NULL)
+{
+    if(getPresetIndex(pSrc) < 0)
+        return false;
+    if(getPresetIndex(pDst) < 0)
+        pDst = CreatePreset();
+    for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
+    {
+        pDst->program[nChannel].program = pSrc->program[nChannel].program;
+        pDst->program[nChannel].bank = pSrc->program[nChannel].bank;
+        pDst->program[nChannel].level = pSrc->program[nChannel].level;
+        pDst->program[nChannel].balance = pSrc->program[nChannel].balance;
+    }
+
+    pDst->name = pSrc->name;
+    pDst->soundfont = pSrc->soundfont;
+    pDst->reverb.enable = pSrc->reverb.enable;
+    pDst->reverb.roomsize = pSrc->reverb.roomsize;
+    pDst->reverb.damping = pSrc->reverb.damping;
+    pDst->reverb.width = pSrc->reverb.width;
+    pDst->reverb.level = pSrc->reverb.level;
+    pDst->chorus.enable = pSrc->chorus.enable;
+    pDst->chorus.voicecount = pSrc->chorus.voicecount;
+    pDst->chorus.level = pSrc->chorus.level;
+    pDst->chorus.speed = pSrc->chorus.speed;
+    pDst->chorus.depth = pSrc->chorus.depth;
+    pDst->chorus.type = pSrc->chorus.type;
+    setDirty(pDst);
+    return true;
 }
 
 /** Handle newPreset event */
@@ -1113,8 +1113,10 @@ void onButton(unsigned int nButton)
             break;
         }
     }
-    if(g_nCurrentScreen == SCREEN_PERFORMANCE && (nButton == BUTTON_UP || nButton == BUTTON_DOWN))
-        selectPreset(g_mapScreens[SCREEN_PERFORMANCE]->GetSelection());
+    if(g_nCurrentScreen == SCREEN_PERFORMANCE && (nButton == BUTTON_UP || nButton == BUTTON_DOWN)
+        && g_mapScreens[SCREEN_PERFORMANCE]->GetSelection() >= 0
+        && g_mapScreens[SCREEN_PERFORMANCE]->GetSelection() < g_vPresets.size())
+        selectPreset(g_vPresets[g_mapScreens[SCREEN_PERFORMANCE]->GetSelection()]);
 }
 
 void onLeftHold(unsigned int nGpio)

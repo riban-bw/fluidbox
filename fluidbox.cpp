@@ -151,6 +151,7 @@ unsigned int g_nCurrentScreen; // Id of currently displayed screen
 unsigned int g_nCurrentChannel = 0; // Selected channel, e.g. within mixer screen
 unsigned int g_nCurrentChar = 0; // Index of highlighted character in name edit
 unsigned int g_nCurrentEffect;
+bool g_bDirty = false;// True if configuration needs to be saved
 
 /**     Return a converted and vaildated value
 *       @param sValue Value as a string
@@ -260,15 +261,19 @@ void refreshPresetList()
 }
 
 /*   Set the dirty flag of a preset
-*    @param pPreset Pointer to the preset
-*    @param bDirty True to flag as dirty
+*    @param pPreset Pointer to the preset - Default: current preset
+*    @param bDirty True to flag as dirty - Default: true
 */
-void setDirty(Preset* pPreset, bool bDirty)
+void setDirty(Preset* pPreset = NULL, bool bDirty = true)
 {
     if(!pPreset)
-        return;
+        pPreset = g_vPresets[g_nCurrentPreset];
     pPreset->dirty = bDirty;
+    if(bDirty)
+        g_bDirty = true;
     refreshPresetList();
+    if(g_nCurrentScreen == SCREEN_PERFORMANCE)
+        showScreen(SCREEN_PERFORMANCE);
 }
 
 /** Save persistent data to configuration file */
@@ -313,6 +318,7 @@ bool saveConfig(string sFilename = "./fb.config")
         setDirty(pPreset, false);
     }
     fileConfig.close();
+    g_bDirty = false;
     return true;
 }
 
@@ -389,7 +395,7 @@ void drawEffectValue(unsigned int nParam, unsigned int nValue)
 void adjustEffect(unsigned int nEffect, int nChange)
 {
     if(nChange)
-        setDirty(g_vPresets[g_nCurrentPreset], true);
+        setDirty();
     double dValue, dDelta, dMax, dMin;
     int nValue;
     switch(nEffect)
@@ -520,7 +526,7 @@ void enableEffect(unsigned int nEffect, bool bEnable = true)
     {
         fluid_synth_set_reverb_on(g_pSynth, bEnable);
         if(g_vPresets[g_nCurrentPreset]->reverb.enable != bEnable)
-            setDirty(g_vPresets[g_nCurrentPreset], true);
+            setDirty();
         g_vPresets[g_nCurrentPreset]->reverb.enable = bEnable;
         sText = "Reverb ";
     }
@@ -528,7 +534,7 @@ void enableEffect(unsigned int nEffect, bool bEnable = true)
     {
         fluid_synth_set_chorus_on(g_pSynth, bEnable);
         if(g_vPresets[g_nCurrentPreset]->chorus.enable != bEnable)
-            setDirty(g_vPresets[g_nCurrentPreset], true);
+            setDirty();
         g_vPresets[g_nCurrentPreset]->chorus.enable = bEnable;
         sText = "Chorus ";
     }
@@ -692,7 +698,7 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
     {
         int nProgram = fluid_midi_event_get_program(pEvent);
         g_vPresets[g_nCurrentPreset]->program[nChannel].program = nProgram;
-        setDirty(g_vPresets[g_nCurrentPreset], true);
+        setDirty();
         if(g_nCurrentScreen == SCREEN_PRESET_PROGRAM)
             showEditProgram();
         break;
@@ -708,7 +714,10 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
         break;
     case 0xB0: //CONTROL_CHANGE
         if(fluid_midi_event_get_control(pEvent) == 7)
+        {
             drawMixerChannel(nChannel, fluid_midi_event_get_value(pEvent));
+            setDirty();
+        }
         break;
     default:
         printf("Unhandled MIDI event type: 0x%02x\n", nType);
@@ -763,7 +772,7 @@ bool loadConfig(string sFilename = "./fb.config")
         string sParam = sLine.substr(0, nDelim);
         string sValue = sLine.substr(nDelim + 1);
 
-        if(sGroup.substr(0,7) == "preset_")
+        if(sGroup.substr(0,6) == "preset")
         {
             if(sParam == "name")
             {
@@ -883,6 +892,7 @@ bool copyPreset(unsigned int nSource, unsigned int nDestination)
     pPresetDst->chorus.speed = pPresetSrc->chorus.speed;
     pPresetDst->chorus.depth = pPresetSrc->chorus.depth;
     pPresetDst->chorus.type = pPresetSrc->chorus.type;
+    setDirty(pPresetDst);
     return true;
 }
 
@@ -943,6 +953,7 @@ void deletePreset(unsigned int)
         --g_nCurrentPreset;
     selectPreset(g_nCurrentPreset);
     showScreen(SCREEN_PERFORMANCE);
+    g_bDirty = true;
 }
 
 /** Handle navigation buttons
@@ -980,6 +991,7 @@ void onButton(unsigned int nButton)
                     return;
                 fluid_synth_cc(g_pSynth, g_nCurrentChannel, 7, ++nLevel);
                 drawMixerChannel(g_nCurrentChannel, nLevel);
+                setDirty();
                 break;
             }
         case BUTTON_DOWN:
@@ -991,6 +1003,7 @@ void onButton(unsigned int nButton)
                     return;
                 fluid_synth_cc(g_pSynth, g_nCurrentChannel, 7, --nLevel);
                 drawMixerChannel(g_nCurrentChannel, nLevel);
+                setDirty();
                 break;
             }
         }

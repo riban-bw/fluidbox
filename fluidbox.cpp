@@ -314,18 +314,40 @@ void power(unsigned int nAction)
     system(sCommand.c_str());
 }
 
-void drawEffectValue(unsigned int nEffect, unsigned int nValue)
+/** Draws representation of current effect parameter value
+*   @param  nParam Index of the effect parameter
+*   @param  nValue Value of parameter, scaled to 0..70
+*/
+void drawEffectValue(unsigned int nParam, unsigned int nValue)
 {
     if(g_nCurrentScreen != SCREEN_EDIT_VALUE)
         return;
-    g_pScreen->DrawRect(0,16, 159,127, BLACK, 0, BLACK);
-    g_pScreen->DrawTriangle(20, 90, 20+nValue, 90, 20+nValue, 90-nValue, DARK_BLUE, 0, DARK_BLUE);
-    g_pScreen->DrawText(g_asEffecParams[nEffect], 20, 110);
+    g_pScreen->DrawRect(0,16, 159,127, BLACK, 0, BLACK); // clear data area (keep title)
+    if(nValue > 70)
+        nValue = 70;
+    unsigned int nX = 25; // x-coord of origin of triangle
+    unsigned int nY = 100; // y-coord of origin of triangle
+    if(nParam == CHORUS_TYPE)
+    {
+        if(nValue == FLUID_CHORUS_MOD_SINE)
+        {
+            for(unsigned int nX = 20; nX < 120; ++nX)
+            {
+                int nY = 35 * sin(2 * PI * 100);
+                g_pScreen->DrawPixel(nX, nY, DARK_BLUE);
+            }
+        }
+        else
+        {
+            g_pScreen->DrawLine(nX, nY - 35, nX + 35, nY, DARK_BLUE);
+            g_pScreen->DrawLine(nX + 35, nY, nX + 70, nY - 70, DARK_BLUE);
+            g_pScreen->DrawLine(nX + 70, nY - 70, nX + 105, nY, DARK_BLUE);
+        }
+        return;
+    }
 
-    /*
-    g_pScreen->DrawCircle(80, 72, 50, DARK_BLUE, 0, DARK_BLUE);
-    g_pScreen->DrawLine(80, 72, ?, ?, WHITE, 2);
-    */
+    g_pScreen->DrawTriangle(nX, nY, nX + nValue, nY, nX + nValue, nY - nValue, DARK_BLUE, 0, DARK_BLUE);
+    g_pScreen->DrawText(g_asEffecParams[nParam], nX, nY + 20);
 }
 
 /** Alters the value of an effect parameter
@@ -334,182 +356,131 @@ void drawEffectValue(unsigned int nEffect, unsigned int nValue)
 */
 void adjustEffect(unsigned int nEffect, int nChange)
 {
-    double dValue;
-    int nValue;
+    double dValue, dDelta, dMax, dMin;
+    int nValue, nDelta, nMax, nMin;
     switch(nEffect)
     {
     case REVERB_DAMPING:
+        dMin = 0.0;
+        dMax = 1.0;
+        dDelta = 0.1;
         dValue = fluid_synth_get_reverb_damp(g_pSynth);
-        if(nChange > 0)
-        {
-            if(dValue <= 0.9)
-                fluid_synth_set_reverb_damp(g_pSynth, dValue + 0.1);
-            else
-                fluid_synth_set_reverb_damp(g_pSynth, 1.0);
-        }
-        else if(nChange < 0)
-        {
-            if(dValue >= 0.1)
-                fluid_synth_set_reverb_damp(g_pSynth, dValue - 0.1);
-            else
-                fluid_synth_set_reverb_damp(g_pSynth, 0.0);
-        }
-        drawEffectValue(nEffect, dValue * 100);
+        dValue += nChange * dDelta;
+        if(dValue > dMax)
+            dValue = dMax;
+        else if(dValue < dMin)
+            dValue = dMin;
+        fluid_synth_set_reverb_damp(g_pSynth, dValue);
+        drawEffectValue(nEffect, dValue * (70 / dMax));
         g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case REVERB_LEVEL:
+        dMin = 0.0;
+        dMax = 1.0;
+        dDelta = 0.1;
         dValue = fluid_synth_get_reverb_level(g_pSynth);
-        if(nChange > 0)
-        {
-            if(dValue <= 0.9)
-                fluid_synth_set_reverb_level(g_pSynth, dValue + 0.1);
-            else
-                fluid_synth_set_reverb_level(g_pSynth, 1.0);
-        }
-        else if(nChange < 0)
-        {
-            if(dValue >= 0.1)
-                fluid_synth_set_reverb_level(g_pSynth, dValue - 0.1);
-            else
-                fluid_synth_set_reverb_level(g_pSynth, 0.0);
-        }
-        drawEffectValue(nEffect, dValue * 100);
+        dValue += nChange * dDelta;
+        if(dValue > dMax)
+            dValue = dMax;
+        else if(dValue < dMin)
+            dValue = dMin;
+        fluid_synth_set_reverb_level(g_pSynth, dValue);
+        drawEffectValue(nEffect, dValue * (70 / dMax));
         g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case REVERB_ROOMSIZE:
+        dMin = 0.0;
+        dMax = 1.2;
+        dDelta = 0.1;
         dValue = fluid_synth_get_reverb_roomsize(g_pSynth);
-        if(nChange > 0)
-        {
-            if(dValue <= 1.1)
-                fluid_synth_set_reverb_roomsize(g_pSynth, dValue + 0.1);
-            else if(nChange < 0)
-                fluid_synth_set_reverb_roomsize(g_pSynth, 1.2);
-        }
-        else
-        {
-            if(dValue >= 0.1)
-                fluid_synth_set_reverb_roomsize(g_pSynth, dValue - 0.1);
-            else
-                fluid_synth_set_reverb_roomsize(g_pSynth, 0.0);
-        }
-        drawEffectValue(nEffect, dValue * 83);
+        dValue += nChange * dDelta;
+        if(dValue > dMax)
+            dValue = dMax;
+        else if(dValue < dMin)
+            dValue = dMin;
+        fluid_synth_set_reverb_roomsize(g_pSynth, dValue);
+        drawEffectValue(nEffect, dValue * (70 / dMax));
         g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case REVERB_WIDTH:
+        dMin = 0.0;
+        dMax = 100.0;
+        dDelta = 1.0;
         dValue = fluid_synth_get_reverb_width(g_pSynth);
-        if(nChange > 0)
-        {
-            if(dValue <= 99.0)
-                fluid_synth_set_reverb_width(g_pSynth, dValue + 1.0);
-            else if(nChange < 0)
-                fluid_synth_set_reverb_width(g_pSynth, 100.0);
-        }
-        else
-        {
-            if(dValue >= 1.0)
-                fluid_synth_set_reverb_width(g_pSynth, dValue - 1.0);
-            else
-                fluid_synth_set_reverb_width(g_pSynth, 0.0);
-        }
-        drawEffectValue(nEffect, dValue * 1);
+        dValue += nChange * dDelta;
+        if(dValue > dMax)
+            dValue = dMax;
+        else if(dValue < dMin)
+            dValue = dMin;
+        fluid_synth_set_reverb_width(g_pSynth, dValue);
+        drawEffectValue(nEffect, dValue * (70 / dMax));
         g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case CHORUS_DEPTH:
+        dMin = 0.0;
+        dMax = 21.0;
+        dDelta = 1.0;
         dValue = fluid_synth_get_chorus_depth(g_pSynth);
-        if(nChange > 0)
-        {
-            if(dValue <= 20.0)
-                fluid_synth_set_chorus_depth(g_pSynth, dValue + 1.0);
-            else if(nChange > 0)
-                fluid_synth_set_chorus_depth(g_pSynth, 21.0);
-        }
-        else
-        {
-            if(dValue >= 1.0)
-                fluid_synth_set_chorus_depth(g_pSynth, dValue - 1.0);
-            else
-                fluid_synth_set_chorus_depth(g_pSynth, 0.0);
-        }
-        drawEffectValue(nEffect, dValue * 5);
+        dValue += nChange * dDelta;
+        if(dValue > dMax)
+            dValue = dMax;
+        else if(dValue < dMin)
+            dValue = dMin;
+        fluid_synth_set_chorus_depth(g_pSynth, dValue);
+        drawEffectValue(nEffect, dValue * (70 / dMax));
         g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case CHORUS_LEVEL:
+        dMin = 0.0;
+        dMax = 10.0;
+        dDelta = 1.0;
         dValue = fluid_synth_get_chorus_level(g_pSynth);
-        if(nChange > 0)
-        {
-            if(dValue <= 9.0)
-                fluid_synth_set_chorus_level(g_pSynth, dValue + 1.0);
-            else if(nChange < 0)
-                fluid_synth_set_chorus_level(g_pSynth, 10.0);
-        }
-        else
-        {
-            if(dValue >= 1.0)
-                fluid_synth_set_chorus_level(g_pSynth, dValue - 1.0);
-            else
-                fluid_synth_set_chorus_level(g_pSynth, 0.0);
-        }
-        drawEffectValue(nEffect, dValue * 10);
+        dValue += nChange * dDelta;
+        if(dValue > dMax)
+            dValue = dMax;
+        else if(dValue < dMin)
+            dValue = dMin;
+        fluid_synth_set_chorus_level(g_pSynth, dValue);
+        drawEffectValue(nEffect, dValue * (70 / dMax));
         g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case CHORUS_SPEED:
+        dMin = 0.1;
+        dMax = 5.0;
+        dDelta = 0.5;
         dValue = fluid_synth_get_chorus_speed(g_pSynth);
-        if(nChange > 0)
-        {
-            if(dValue <= 4.9)
-                fluid_synth_set_chorus_speed(g_pSynth, dValue + 0.1);
-            else if(nChange < 0)
-                fluid_synth_set_chorus_speed(g_pSynth, 5.0);
-        }
-        else
-        {
-            if(dValue >= 0.2)
-                fluid_synth_set_chorus_speed(g_pSynth, dValue - 0.1);
-            else
-                fluid_synth_set_chorus_speed(g_pSynth, 0.1);
-        }
-        drawEffectValue(nEffect, dValue * 20);
+        dValue += nChange * dDelta;
+        if(dValue > dMax)
+            dValue = dMax;
+        else if(dValue < dMin)
+            dValue = dMin;
+        fluid_synth_set_chorus_speed(g_pSynth, dValue);
+        drawEffectValue(nEffect, dValue * (70 / dMax));
         g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     case CHORUS_TYPE:
-        //!@todo Validate chorus type range
-        nValue = fluid_synth_get_chorus_type(g_pSynth);
+        // min:FLUID_CHORUS_MOD_SINE==0, max:FLUID_CHORUS_MOD_TRIANGLE==1
         if(nChange > 0)
-        {
-            if(nValue <= 1)
-                fluid_synth_set_chorus_type(g_pSynth, nValue + 1);
-            else if(nChange < 0)
-                fluid_synth_set_chorus_type(g_pSynth, 2);
-        }
-        else
-        {
-            if(nValue >= 1)
-                fluid_synth_set_chorus_type(g_pSynth, nValue - 1);
-            else
-                fluid_synth_set_chorus_type(g_pSynth, 0);
-        }
-        drawEffectValue(nEffect, nValue * 50);
-        g_pScreen->DrawText(to_string(nValue), 20, 32);
+            fluid_synth_set_chorus_type(g_pSynth, FLUID_CHORUS_MOD_TRIANGLE);
+        else if(nChange < 0)
+            fluid_synth_set_chorus_type(g_pSynth, FLUID_CHORUS_MOD_SINE);
+        nValue = fluid_synth_get_chorus_type(g_pSynth);
+        drawEffectValue(nEffect, nValue);
+        g_pScreen->DrawText(nValue==FLUID_CHORUS_MOD_SINE?"SINE":"TRIANGLE", 20, 32);
         break;
     case CHORUS_VOICES:
-        //!@todo Validate chorus type range
-        nValue = fluid_synth_get_chorus_nr(g_pSynth);
-        if(nChange > 0)
-        {
-            if(nValue <= 98)
-                fluid_synth_set_chorus_nr(g_pSynth, nValue + 1);
-            else if(nChange < 0)
-                fluid_synth_set_chorus_nr(g_pSynth, 99);
-        }
-        else
-        {
-            if(nValue >= 1)
-                fluid_synth_set_chorus_nr(g_pSynth, nValue - 1);
-            else
-                fluid_synth_set_chorus_nr(g_pSynth, 0);
-        }
-        drawEffectValue(nEffect, nValue * 1);
-        g_pScreen->DrawText(to_string(nValue), 20, 32);
+        dMin = 0.0;
+        dMax = 99.0;
+        dDelta = 1.0;
+        dValue = fluid_synth_get_chorus_nr(g_pSynth);
+        dValue += nChange * dDelta;
+        if(dValue > dMax)
+            dValue = dMax;
+        else if(dValue < dMin)
+            dValue = dMin;
+        fluid_synth_set_chorus_nr(g_pSynth, (int)dValue);
+        drawEffectValue(nEffect, dValue * (70 / dMax));
+        g_pScreen->DrawText(to_string(dValue), 20, 32);
         break;
     }
 }

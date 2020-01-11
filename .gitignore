@@ -33,5 +33,7 @@
 
 fb.config
 fluidbox
+fluidbox.debug
 fluidboxmanager
+fluidboxmanager.debug
 sf2/*

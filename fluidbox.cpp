@@ -476,36 +476,47 @@ void adjustEffect(unsigned int nEffect, int nChange)
     g_pScreen->DrawText(sValue, 20, 32);
 }
 
+/**  Set enable or disable an effect
+*    @param nEffect Index of the effect [REVERB_ENABLE | CHORUS_ENABLE]
+*    @param bEnable True to enable, false to disable - default true
+*/
+void enableEffect(unsigned int nEffect, bool bEnable = true)
+{
+    string sText;
+    if(nEffect == REVERB_ENABLE)
+    {
+        fluid_synth_set_reverb_on(g_pSynth, bEnable);
+        g_vPresets[g_nCurrentPreset]->reverb.enable = bEnable;
+        sText = "Reverb ";
+    }
+    else if(nEffect == CHORUS_ENABLE)
+    {
+        fluid_synth_set_chorus_on(g_pSynth, bEnable);
+        g_vPresets[g_nCurrentPreset]->chorus.enable = bEnable;
+        sText = "Chorus ";
+    }
+    else
+        return;
+    for(unsigned int nIndex = nEffect + 1; nIndex < (nEffect==REVERB_ENABLE?5:12); ++nIndex)
+        g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, bEnable);
+    g_vPresets[g_nCurrentPreset]->dirty = true;
+    sText += bEnable?"enabled":"disabled";
+    g_mapScreens[SCREEN_EFFECTS]->SetEntryText(nEffect, sText);
+    g_mapScreens[SCREEN_EFFECTS]->Draw();
+}
+
 void editEffect(unsigned int nParam)
 {
     switch(nParam)
     {
     case REVERB_ENABLE:
         {
-            bool bEnabled = !g_vPresets[g_nCurrentPreset]->reverb.enable;
-            g_vPresets[g_nCurrentPreset]->reverb.enable = bEnabled;
-            g_vPresets[g_nCurrentPreset]->dirty = true;
-            for(unsigned int nIndex = 1; nIndex < 5; ++nIndex)
-                g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, bEnabled);
-            fluid_synth_set_reverb_on(g_pSynth, bEnabled);
-            string sText = "Reverb ";
-            sText += bEnabled?"enabled":"disabled";
-            g_mapScreens[SCREEN_EFFECTS]->SetEntryText(REVERB_ENABLE, sText);
-            g_mapScreens[SCREEN_EFFECTS]->Draw();
+            enableEffect(nParam, !(g_vPresets[g_nCurrentPreset]->reverb.enable));
             break;
         }
     case CHORUS_ENABLE:
         {
-            bool bEnabled = !g_vPresets[g_nCurrentPreset]->chorus.enable;
-            g_vPresets[g_nCurrentPreset]->chorus.enable = bEnabled;
-            g_vPresets[g_nCurrentPreset]->dirty = true;
-            for(unsigned int nIndex = 6; nIndex < 12; ++nIndex)
-                g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, bEnabled);
-            fluid_synth_set_chorus_on(g_pSynth, bEnabled);
-            string sText = "Chorus ";
-            sText += bEnabled?"enabled":"disabled";
-            g_mapScreens[SCREEN_EFFECTS]->SetEntryText(CHORUS_ENABLE, sText);
-                g_mapScreens[SCREEN_EFFECTS]->Draw();
+            enableEffect(nParam, !(g_vPresets[g_nCurrentPreset]->chorus.enable));
             break;
         }
     case CHORUS_VOICES:
@@ -856,6 +867,8 @@ bool selectPreset(unsigned int nPreset)
     Preset* pPreset = g_vPresets[nPreset];
     bool bSoundfontChanged = (g_nCurrentPreset >= 0 && g_nCurrentPreset < g_vPresets.size() && pPreset->soundfont != g_vPresets[g_nCurrentPreset]->soundfont);
     g_nCurrentPreset = nPreset;
+    enableEffect(REVERB_ENABLE, g_vPresets[g_nCurrentPreset]->reverb.enable);
+    enableEffect(CHORUS_ENABLE, g_vPresets[g_nCurrentPreset]->chorus.enable);
     if(bSoundfontChanged || g_nCurrentSoundfont < 0)
         if(!loadSoundfont(pPreset->soundfont))
             return false;
@@ -1171,14 +1184,10 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_POWER]->Add("Reboot",  power, POWER_REBOOT);
 
     g_mapScreens[SCREEN_EFFECTS]->Add("Reverb enable", editEffect, REVERB_ENABLE);
-    int nIndex = g_mapScreens[SCREEN_EFFECTS]->Add("Reverb room size", editEffect, REVERB_ROOMSIZE);
-    g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, false);
-    nIndex = g_mapScreens[SCREEN_EFFECTS]->Add("Reverb damping", editEffect, REVERB_DAMPING);
-    g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, false);
-    nIndex = g_mapScreens[SCREEN_EFFECTS]->Add("Reverb width", editEffect, REVERB_WIDTH);
-    g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, false);
-    nIndex = g_mapScreens[SCREEN_EFFECTS]->Add("Reverb level", editEffect, REVERB_LEVEL);
-    g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, false);
+    g_mapScreens[SCREEN_EFFECTS]->Add("Reverb room size", editEffect, REVERB_ROOMSIZE);
+    g_mapScreens[SCREEN_EFFECTS]->Add("Reverb damping", editEffect, REVERB_DAMPING);
+    g_mapScreens[SCREEN_EFFECTS]->Add("Reverb width", editEffect, REVERB_WIDTH);
+    g_mapScreens[SCREEN_EFFECTS]->Add("Reverb level", editEffect, REVERB_LEVEL);
 
     g_mapScreens[SCREEN_EFFECTS]->Add("Chorus enable", editEffect, CHORUS_ENABLE);
     g_mapScreens[SCREEN_EFFECTS]->Add("Chorus voices", editEffect, CHORUS_VOICES);

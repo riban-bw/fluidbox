@@ -744,7 +744,9 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
 }
 
 
-/** Load configuration from file */
+/** Load configuration from file
+*   @param  sFilename Full path and filename of configuration file
+*/
 bool loadConfig(string sFilename = "./fb.config")
 {
     ifstream fileConfig;
@@ -790,63 +792,63 @@ bool loadConfig(string sFilename = "./fb.config")
         string sParam = sLine.substr(0, nDelim);
         string sValue = sLine.substr(nDelim + 1);
 
-        if(sGroup.substr(0,6) == "preset")
+        if(sGroup.substr(0,6) == "preset" && pPreset)
         {
             if(sParam == "selected" && sValue != "0")
                 g_pCurrentPreset = pPreset;
             if(sParam == "name")
             {
                 sValue.resize(MAX_NAME_LEN, ' ');
-                g_vPresets[nPreset]->name = sValue;
+                pPreset->name = sValue;
             }
             else if(sParam == "soundfont")
-                g_vPresets[nPreset]->soundfont = sValue;
+                pPreset->soundfont = sValue;
             else if(sParam.substr(0,5) == "prog_")
             {
                 int nChan = validateInt(sParam.substr(5), 0, 15);
                 nDelim = sValue.find_first_of(':');
                 if(nDelim == string::npos)
                     continue; // Not a valid bank:program value pair
-                g_vPresets[nPreset]->program[nChan].bank = validateInt(sValue.substr(0,nDelim), 0, 16383);
-                g_vPresets[nPreset]->program[nChan].program = validateInt(sValue.substr(nDelim + 1), 0, 127);
+                pPreset->program[nChan].bank = validateInt(sValue.substr(0,nDelim), 0, 16383);
+                pPreset->program[nChan].program = validateInt(sValue.substr(nDelim + 1), 0, 127);
             }
             else if(sParam.substr(0,6) == "level_")
             {
                 int nChan = validateInt(sParam.substr(6), 0, 15);
-                g_vPresets[nPreset]->program[nChan].level = validateInt(sValue, 0, 127);
+                pPreset->program[nChan].level = validateInt(sValue, 0, 127);
             }
             else if(sParam.substr(0,8) == "balance_")
             {
                 int nChan = validateInt(sParam.substr(8), 0, 15);
-                g_vPresets[nPreset]->program[nChan].balance = validateInt(sValue, 0, 127);
+                pPreset->program[nChan].balance = validateInt(sValue, 0, 127);
             }
             else if (sParam.substr(0,7) == "reverb_")
             {
                 if(sParam.substr(7) == "enable")
-                    g_vPresets[nPreset]->reverb.enable = (sValue == "1");
+                    pPreset->reverb.enable = (sValue == "1");
                 if(sParam.substr(7) == "roomsize")
-                    g_vPresets[nPreset]->reverb.roomsize = validateDouble(sValue, 0.0, 1.2);
+                    pPreset->reverb.roomsize = validateDouble(sValue, 0.0, 1.2);
                 if(sParam.substr(7) == "damping")
-                    g_vPresets[nPreset]->reverb.damping = validateDouble(sValue, 0.0, 1.0);
+                    pPreset->reverb.damping = validateDouble(sValue, 0.0, 1.0);
                 if(sParam.substr(7) == "width")
-                    g_vPresets[nPreset]->reverb.width = validateDouble(sValue, 0.0, 100.0);
+                    pPreset->reverb.width = validateDouble(sValue, 0.0, 100.0);
                 if(sParam.substr(7) == "level")
-                    g_vPresets[nPreset]->reverb.level = validateDouble(sValue, 0.0, 1.0);
+                    pPreset->reverb.level = validateDouble(sValue, 0.0, 1.0);
             }
             else if (sParam.substr(0,7) == "chorus_")
             {
                 if(sParam.substr(7) == "enable")
-                    g_vPresets[nPreset]->chorus.enable = (sValue == "1");
+                    pPreset->chorus.enable = (sValue == "1");
                 if(sParam.substr(7) == "voicecount")
-                    g_vPresets[nPreset]->chorus.voicecount = validateInt(sValue, 0, 99);
+                    pPreset->chorus.voicecount = validateInt(sValue, 0, 99);
                 if(sParam.substr(7) == "level")
-                    g_vPresets[nPreset]->chorus.level = validateDouble(sValue, 0.0, 10.0);
+                    pPreset->chorus.level = validateDouble(sValue, 0.0, 10.0);
                 if(sParam.substr(7) == "speed")
-                    g_vPresets[nPreset]->chorus.speed = validateDouble(sValue, 0.1, 5.0);
+                    pPreset->chorus.speed = validateDouble(sValue, 0.1, 5.0);
                 if(sParam.substr(7) == "depth")
-                    g_vPresets[nPreset]->chorus.depth = validateDouble(sValue, 0.0, 21.0);
+                    pPreset->chorus.depth = validateDouble(sValue, 0.0, 21.0);
                 if(sParam.substr(7) == "type")
-                    g_vPresets[nPreset]->chorus.type = validateInt(sValue, 0, 1);
+                    pPreset->chorus.type = validateInt(sValue, 0, 1);
             }
         }
         if(!g_pCurrentPreset)
@@ -890,25 +892,25 @@ bool copyPreset(Preset* pSrc, Preset* pDst= NULL)
         pDst = CreatePreset();
     for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
     {
-        pPresetDst->program[nChannel].program = pPresetSrc->program[nChannel].program;
-        pPresetDst->program[nChannel].bank = pPresetSrc->program[nChannel].bank;
-        pPresetDst->program[nChannel].level = pPresetSrc->program[nChannel].level;
-        pPresetDst->program[nChannel].balance = pPresetSrc->program[nChannel].balance;
+        pDst->program[nChannel].program = pSrc->program[nChannel].program;
+        pDst->program[nChannel].bank = pSrc->program[nChannel].bank;
+        pDst->program[nChannel].level = pSrc->program[nChannel].level;
+        pDst->program[nChannel].balance = pSrc->program[nChannel].balance;
     }
 
-    pPresetDst->name = pPresetSrc->name;
-    pPresetDst->soundfont = pPresetSrc->soundfont;
-    pPresetDst->reverb.enable = pPresetSrc->reverb.enable;
-    pPresetDst->reverb.roomsize = pPresetSrc->reverb.roomsize;
-    pPresetDst->reverb.damping = pPresetSrc->reverb.damping;
-    pPresetDst->reverb.width = pPresetSrc->reverb.width;
-    pPresetDst->reverb.level = pPresetSrc->reverb.level;
-    pPresetDst->chorus.enable = pPresetSrc->chorus.enable;
-    pPresetDst->chorus.voicecount = pPresetSrc->chorus.voicecount;
-    pPresetDst->chorus.level = pPresetSrc->chorus.level;
-    pPresetDst->chorus.speed = pPresetSrc->chorus.speed;
-    pPresetDst->chorus.depth = pPresetSrc->chorus.depth;
-    pPresetDst->chorus.type = pPresetSrc->chorus.type;
+    pDst->name = pSrc->name;
+    pDst->soundfont = pSrc->soundfont;
+    pDst->reverb.enable = pSrc->reverb.enable;
+    pDst->reverb.roomsize = pSrc->reverb.roomsize;
+    pDst->reverb.damping = pSrc->reverb.damping;
+    pDst->reverb.width = pSrc->reverb.width;
+    pDst->reverb.level = pSrc->reverb.level;
+    pDst->chorus.enable = pSrc->chorus.enable;
+    pDst->chorus.voicecount = pSrc->chorus.voicecount;
+    pDst->chorus.level = pSrc->chorus.level;
+    pDst->chorus.speed = pSrc->chorus.speed;
+    pDst->chorus.depth = pSrc->chorus.depth;
+    pDst->chorus.type = pSrc->chorus.type;
     setDirty(pPresetDst);
     return true;
 }
@@ -924,7 +926,7 @@ bool selectPreset(Preset* pPreset)
         return false;
     cout << "Select preset " << nPreset << endl;
     bool bSoundfontChanged = (g_pCurrentPreset && pPreset->soundfont != g_pCurrentPreset->soundfont);
-    g_pCurrentPreset = g_vPresets[nPreset];
+    g_pCurrentPreset = pPreset;
     g_mapScreens[SCREEN_PERFORMANCE]->SetSelection(getPresetIndex(g_pCurrentPreset));
     enableEffect(REVERB_ENABLE, g_pCurrentPreset->reverb.enable);
     enableEffect(CHORUS_ENABLE, g_pCurrentPreset->chorus.enable);
@@ -949,14 +951,13 @@ Preset* CreatePreset()
     Preset* pPreset = new Preset;
     g_vPresets.push_back(pPreset);
     refreshPresetList();
-    return pPreset();
+    return pPreset;
 }
 
 /** Handle newPreset event */
 void newPreset(unsigned int)
 {
-    CreatePreset();
-    selectPreset(pPreset);
+    selectPreset(CreatePreset());
     showScreen(SCREEN_PERFORMANCE);
 }
 
@@ -970,7 +971,7 @@ void deletePreset(unsigned int)
     }
 
     auto it = g_vPresets.begin();
-    for(; it !< g_vPresets.end(); ++it)
+    for(; it != g_vPresets.end(); ++it)
     {
         if(*(it) == g_pCurrentPreset)
             break;

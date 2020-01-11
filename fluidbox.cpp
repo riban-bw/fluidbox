@@ -16,6 +16,7 @@
 #define MAX_PRESETS 127
 #define CHANNELS_IN_PROG_SCREEN 6
 #define PI 3.14159265359
+#define MAX_NAME_LEN 20
 
 // Define GPIO pin usage (note some are not used by code but useful for planning
 #define BUTTON_UP      4
@@ -122,7 +123,7 @@ struct Chorus
 /** Parameters used by presets */
 struct Preset
 {
-    string name = "New preset";
+    string name = "New preset          ";
     string soundfont = DEFAULT_SOUNDFONT;
     Program program[16];
     Reverb reverb;
@@ -240,6 +241,35 @@ void panic(int nMode=PANIC_NOTES, int nChannel=16)
     }
 }
 
+/*   Refresh the content of the presets list in the performance screen */
+void refreshPresetList()
+{
+    g_mapScreens[SCREEN_PERFORMANCE]->ClearList();
+    for(auto it = g_vPresets.begin(); it != g_vPresets.end(); ++it)
+    {
+        Preset* pPreset = *it;
+        string sName;
+        if(pPreset->dirty)
+            sName += "*";
+        sName += pPreset->name;
+        g_mapScreens[SCREEN_PERFORMANCE]->Add(sName, showScreen, SCREEN_EDIT);
+    }
+    if(g_nCurrentPreset >= g_mapScreens.size())
+        g_nCurrentPreset = g_mapScreens.size() - 1;
+    g_mapScreens[SCREEN_PERFORMANCE]->SetSelection(g_nCurrentPreset);
+}
+
+/*   Set the dirty flag of a preset
+*    @param pPreset Pointer to the preset
+*    @param bDirty True to flag as dirty
+*/
+void setDirty(Preset* pPreset, bool bDirty)
+{
+    if(!pPreset)
+        return;
+    pPreset->dirty = bDirty;
+    refreshPresetList();
+}
 
 /** Save persistent data to configuration file */
 bool saveConfig(string sFilename = "./fb.config")
@@ -257,28 +287,30 @@ bool saveConfig(string sFilename = "./fb.config")
     fileConfig << "preset=" << to_string(g_nCurrentPreset) << endl;
 
     // Save presets
-    for(unsigned int nPreset = 0; nPreset < g_vPresets.size(); ++nPreset)
+    for(auto it = g_vPresets.begin(); it != g_vPresets.end(); ++it)
     {
-        fileConfig << endl << "[preset_" << nPreset << "]" << endl;
-        fileConfig << endl << "name=" << g_vPresets[nPreset]->name << endl;
-        fileConfig << endl << "soundfont=" << g_vPresets[nPreset]->soundfont << endl;
+        Preset* pPreset = *it;
+        fileConfig << endl << "[preset]" << endl;
+        fileConfig << endl << "name=" << pPreset->name << endl;
+        fileConfig << endl << "soundfont=" << pPreset->soundfont << endl;
         for(unsigned int nProgram = 0; nProgram < 16; ++nProgram)
         {
-            fileConfig << "prog_" << nProgram << "=" << g_vPresets[nPreset]->program[nProgram].bank << ":" << g_vPresets[nPreset]->program[nProgram].program << endl;
-            fileConfig << "level_" << nProgram << "=" << g_vPresets[nPreset]->program[nProgram].level << endl;
-            fileConfig << "balance_" << nProgram << "=" << g_vPresets[nPreset]->program[nProgram].balance << endl;
+            fileConfig << "prog_" << nProgram << "=" << pPreset->program[nProgram].bank << ":" << pPreset->program[nProgram].program << endl;
+            fileConfig << "level_" << nProgram << "=" << pPreset->program[nProgram].level << endl;
+            fileConfig << "balance_" << nProgram << "=" << pPreset->program[nProgram].balance << endl;
         }
-        fileConfig << "reverb_enable=" <<  (g_vPresets[nPreset]->reverb.enable?"1":"0") << endl;
-        fileConfig << "reverb_roomsize=" <<  g_vPresets[nPreset]->reverb.roomsize << endl;
-        fileConfig << "reverb_damping=" <<  g_vPresets[nPreset]->reverb.damping << endl;
-        fileConfig << "reverb_width=" <<  g_vPresets[nPreset]->reverb.width << endl;
-        fileConfig << "reverb_level=" <<  g_vPresets[nPreset]->reverb.level << endl;
-        fileConfig << "chorus_enable=" <<  g_vPresets[nPreset]->chorus.enable << endl;
-        fileConfig << "chorus_voicecount=" <<  g_vPresets[nPreset]->chorus.voicecount << endl;
-        fileConfig << "chorus_level=" <<  g_vPresets[nPreset]->chorus.level << endl;
-        fileConfig << "chorus_speed=" <<  g_vPresets[nPreset]->chorus.speed << endl;
-        fileConfig << "chorus_depth=" <<  g_vPresets[nPreset]->chorus.depth << endl;
-        fileConfig << "chorus_type=" <<  g_vPresets[nPreset]->chorus.type << endl;
+        fileConfig << "reverb_enable=" <<  (pPreset->reverb.enable?"1":"0") << endl;
+        fileConfig << "reverb_roomsize=" <<  pPreset->reverb.roomsize << endl;
+        fileConfig << "reverb_damping=" <<  pPreset->reverb.damping << endl;
+        fileConfig << "reverb_width=" <<  pPreset->reverb.width << endl;
+        fileConfig << "reverb_level=" <<  pPreset->reverb.level << endl;
+        fileConfig << "chorus_enable=" <<  pPreset->chorus.enable << endl;
+        fileConfig << "chorus_voicecount=" <<  pPreset->chorus.voicecount << endl;
+        fileConfig << "chorus_level=" <<  pPreset->chorus.level << endl;
+        fileConfig << "chorus_speed=" <<  pPreset->chorus.speed << endl;
+        fileConfig << "chorus_depth=" <<  pPreset->chorus.depth << endl;
+        fileConfig << "chorus_type=" <<  pPreset->chorus.type << endl;
+        setDirty(pPreset, false);
     }
     fileConfig.close();
     return true;
@@ -357,7 +389,7 @@ void drawEffectValue(unsigned int nParam, unsigned int nValue)
 void adjustEffect(unsigned int nEffect, int nChange)
 {
     if(nChange)
-        g_vPresets[g_nCurrentPreset]->dirty = true;
+        setDirty(g_vPresets[g_nCurrentPreset], true);
     double dValue, dDelta, dMax, dMin;
     int nValue;
     switch(nEffect)
@@ -483,15 +515,20 @@ void adjustEffect(unsigned int nEffect, int nChange)
 void enableEffect(unsigned int nEffect, bool bEnable = true)
 {
     string sText;
+    bool bWasEnabled;
     if(nEffect == REVERB_ENABLE)
     {
         fluid_synth_set_reverb_on(g_pSynth, bEnable);
+        if(g_vPresets[g_nCurrentPreset]->reverb.enable != bEnable)
+            setDirty(g_vPresets[g_nCurrentPreset], true);
         g_vPresets[g_nCurrentPreset]->reverb.enable = bEnable;
         sText = "Reverb ";
     }
     else if(nEffect == CHORUS_ENABLE)
     {
         fluid_synth_set_chorus_on(g_pSynth, bEnable);
+        if(g_vPresets[g_nCurrentPreset]->chorus.enable != bEnable)
+            setDirty(g_vPresets[g_nCurrentPreset], true);
         g_vPresets[g_nCurrentPreset]->chorus.enable = bEnable;
         sText = "Chorus ";
     }
@@ -499,10 +536,8 @@ void enableEffect(unsigned int nEffect, bool bEnable = true)
         return;
     for(unsigned int nIndex = nEffect + 1; nIndex < (nEffect==REVERB_ENABLE?5:12); ++nIndex)
         g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, bEnable);
-    g_vPresets[g_nCurrentPreset]->dirty = true;
     sText += bEnable?"enabled":"disabled";
     g_mapScreens[SCREEN_EFFECTS]->SetEntryText(nEffect, sText);
-    g_mapScreens[SCREEN_EFFECTS]->Draw();
 }
 
 void editEffect(unsigned int nParam)
@@ -512,11 +547,13 @@ void editEffect(unsigned int nParam)
     case REVERB_ENABLE:
         {
             enableEffect(nParam, !(g_vPresets[g_nCurrentPreset]->reverb.enable));
+            g_mapScreens[SCREEN_EFFECTS]->Draw();
             break;
         }
     case CHORUS_ENABLE:
         {
             enableEffect(nParam, !(g_vPresets[g_nCurrentPreset]->chorus.enable));
+            g_mapScreens[SCREEN_EFFECTS]->Draw();
             break;
         }
     case CHORUS_VOICES:
@@ -619,11 +656,6 @@ void showScreen(int nScreen)
         return;
     if(nScreen == SCREEN_PERFORMANCE)
     {
-        string sName;
-        if(g_vPresets[g_nCurrentPreset]->dirty)
-            sName += "*";
-        sName += g_vPresets[g_nCurrentPreset]->name;
-        g_mapScreens[SCREEN_PERFORMANCE]->SetEntryText(g_nCurrentPreset, sName);
         it->second->SetSelection(g_nCurrentPreset);
     }
     it->second->Draw();
@@ -660,7 +692,7 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
     {
         int nProgram = fluid_midi_event_get_program(pEvent);
         g_vPresets[g_nCurrentPreset]->program[nChannel].program = nProgram;
-        g_vPresets[g_nCurrentPreset]->dirty = true;
+        setDirty(g_vPresets[g_nCurrentPreset], true);
         if(g_nCurrentScreen == SCREEN_PRESET_PROGRAM)
             showEditProgram();
         break;
@@ -718,10 +750,8 @@ bool loadConfig(string sFilename = "./fb.config")
             int nEnd = sLine.find_first_of(']');
             sGroup = sLine.substr(1, nEnd-1);
 
-            if(sGroup.substr(0,7) == "preset_")
+            if(sGroup.substr(0,6) == "preset")
             {
-                //!@todo We are not using the preset index defined in config file
-                //nPreset = validateInt(sGroup.substr(7), 0, MAX_PRESETS);
                 nPreset = g_vPresets.size();
                 g_vPresets.push_back(new Preset);
             }
@@ -736,7 +766,10 @@ bool loadConfig(string sFilename = "./fb.config")
         if(sGroup.substr(0,7) == "preset_")
         {
             if(sParam == "name")
+            {
+                sValue.resize(MAX_NAME_LEN, ' ');
                 g_vPresets[nPreset]->name = sValue;
+            }
             else if(sParam == "soundfont")
                 g_vPresets[nPreset]->soundfont = sValue;
             else if(sParam.substr(0,5) == "prog_")
@@ -867,6 +900,7 @@ bool selectPreset(unsigned int nPreset)
     Preset* pPreset = g_vPresets[nPreset];
     bool bSoundfontChanged = (g_nCurrentPreset >= 0 && g_nCurrentPreset < g_vPresets.size() && pPreset->soundfont != g_vPresets[g_nCurrentPreset]->soundfont);
     g_nCurrentPreset = nPreset;
+    g_mapScreens[SCREEN_PERFORMANCE]->SetSelection(g_nCurrentPreset);
     enableEffect(REVERB_ENABLE, g_vPresets[g_nCurrentPreset]->reverb.enable);
     enableEffect(CHORUS_ENABLE, g_vPresets[g_nCurrentPreset]->chorus.enable);
     if(bSoundfontChanged || g_nCurrentSoundfont < 0)
@@ -886,7 +920,7 @@ void newPreset(unsigned int)
     //!@todo Insert new preset at current position
     unsigned int nPreset = g_vPresets.size();;
     g_vPresets.push_back(new Preset);
-    g_mapScreens[SCREEN_PERFORMANCE]->Add(g_vPresets[nPreset]->name, showScreen, SCREEN_EDIT);
+    refreshPresetList();
     selectPreset(g_vPresets.size() - 1);
     showScreen(SCREEN_PERFORMANCE);
 }
@@ -904,7 +938,7 @@ void deletePreset(unsigned int)
         ++it;
     delete *it;
     g_vPresets.erase(it);
-    g_mapScreens[SCREEN_PERFORMANCE]->Remove(g_nCurrentPreset);
+    refreshPresetList();
     if(g_nCurrentPreset)
         --g_nCurrentPreset;
     selectPreset(g_nCurrentPreset);
@@ -914,7 +948,7 @@ void deletePreset(unsigned int)
 /** Handle navigation buttons
     @param nButton Index of button pressed
 */
-void onNavigate(unsigned int nButton)
+void onButton(unsigned int nButton)
 {
     switch(g_nCurrentScreen)
     {
@@ -970,7 +1004,7 @@ void onNavigate(unsigned int nButton)
                 if(++c < 32 || c > 126)
                     c = 32;
                 g_vPresets[g_nCurrentPreset]->name[g_nCurrentChar] = c;
-                g_vPresets[g_nCurrentPreset]->dirty = true;
+                setDirty(g_vPresets[g_nCurrentPreset], true);
                 drawPresetName();
                 break;
             }
@@ -980,12 +1014,12 @@ void onNavigate(unsigned int nButton)
                 if(--c < 32 || c > 126)
                     c = 126;
                 g_vPresets[g_nCurrentPreset]->name[g_nCurrentChar] = c;
-                g_vPresets[g_nCurrentPreset]->dirty = true;
+                setDirty(g_vPresets[g_nCurrentPreset], true);
                 drawPresetName();
                 break;
             }
         case BUTTON_RIGHT:
-            if(g_nCurrentChar >= 15)
+            if(g_nCurrentChar >= MAX_NAME_LEN - 1)
                 return;
             ++g_nCurrentChar;
             drawPresetName();
@@ -1136,10 +1170,10 @@ int main(int argc, char** argv)
     // Configure buttons
     wiringPiSetupGpio();
     ButtonHandler buttonHandler;
-    buttonHandler.AddButton(BUTTON_UP, onNavigate);
-    buttonHandler.AddButton(BUTTON_DOWN, onNavigate);
-    buttonHandler.AddButton(BUTTON_LEFT, NULL, onNavigate, onLeftHold);
-    buttonHandler.AddButton(BUTTON_RIGHT, NULL, onNavigate, onRightHold);
+    buttonHandler.AddButton(BUTTON_UP, onButton);
+    buttonHandler.AddButton(BUTTON_DOWN, onButton);
+    buttonHandler.AddButton(BUTTON_LEFT, NULL, onButton, onLeftHold);
+    buttonHandler.AddButton(BUTTON_RIGHT, NULL, onButton, onRightHold);
     buttonHandler.SetRepeatPeriod(BUTTON_UP, 100);
     buttonHandler.SetRepeatPeriod(BUTTON_DOWN, 100);
     cout << "Configured buttons" << endl;
@@ -1161,9 +1195,6 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_MIXER] = new ListScreen(g_pScreen,  "Mixer", SCREEN_EDIT);
     g_mapScreens[SCREEN_SOUNDFONT] = new ListScreen(g_pScreen, "Soundfont", SCREEN_EDIT);
     g_mapScreens[SCREEN_EDIT_VALUE] = new ListScreen(g_pScreen, "Set Value", SCREEN_EFFECTS);
-
-    for(unsigned int nPreset=0; nPreset < g_vPresets.size(); ++nPreset)
-        g_mapScreens[SCREEN_PERFORMANCE]->Add(g_vPresets[nPreset]->name, showScreen, SCREEN_EDIT);
 
     g_mapScreens[SCREEN_EDIT]->Add("Mixer", showScreen, SCREEN_MIXER);
     g_mapScreens[SCREEN_EDIT]->Add("Effects", showScreen, SCREEN_EFFECTS);
@@ -1200,8 +1231,8 @@ int main(int argc, char** argv)
     // Select preset
     if(g_vPresets.size() == 0)
         newPreset(0);
+    refreshPresetList();
     selectPreset(g_nCurrentPreset);
-    g_mapScreens[SCREEN_PERFORMANCE]->SetSelection(g_nCurrentPreset);
 
     // Show splash screen for a while (idle delay)
     alarm(2);

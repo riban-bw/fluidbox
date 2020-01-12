@@ -647,10 +647,10 @@ void drawMixerChannel(unsigned int nChannel, int nLevel = -1)
     if(nLevel < 0)
         nLevel = 0;
     nLevel = (nLevel * 100) / 127;
-    g_pScreen->DrawRect(nChannel * 10, 20, nChannel * 10 + 10, 127, BLACK, 1, BLACK);
-    g_pScreen->DrawRect(nChannel * 10 + 1, 120, nChannel * 10 + 8, 120 - nLevel, DARK_GREEN, 0, DARK_GREEN);
-    g_pScreen->DrawRect(0,127, 159,121, BLACK, 0, BLACK);
-    g_pScreen->DrawRect(g_nCurrentChannel * 10, 124, g_nCurrentChannel * 10 + 10,121, RED, 0, RED);
+    g_pScreen->DrawRect(nChannel * 10, 20, nChannel * 10 + 9, 120, WHITE, 1, BLACK); // Frame for fader
+    g_pScreen->DrawRect(nChannel * 10 + 1, 120, nChannel * 10 + 8, 120 - nLevel, DARK_GREEN, 0, DARK_GREEN); // Fader
+    g_pScreen->DrawRect(0,127, 159,121, BLACK, 0, BLACK); // Frame for selection highlight
+    g_pScreen->DrawRect(g_nCurrentChannel * 10, 124, g_nCurrentChannel * 10 + 10,121, BLUE, 0, BLUE); // Selection highlight
 }
 
 /** Draw preset name screen

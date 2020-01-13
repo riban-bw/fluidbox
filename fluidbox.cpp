@@ -86,9 +86,6 @@ enum EFFECT_PARAM
     CHORUS_TYPE
 };
 
-string g_asEffecParams[] = {"Reverb enable", "Reverb roomsize", "Reverb damping", "Reverb Width", "Reverb Level", "Chorus enable",
- "Chorus voices", "Chorus level", "Chorus speed", "Chorus depth", "Chorus type"};
-
 /** MIDI program parameters */
 struct Program
 {
@@ -115,9 +112,9 @@ struct Chorus
     bool enable = false;
     int voicecount = 0;
     double level = 0;
-    double speed = 0;
+    double speed = 0.1;
     double depth = 0;
-    int type = 0;
+    int type = FLUID_CHORUS_MOD_SINE;
 };
 
 /** Parameters used by presets */
@@ -130,6 +127,66 @@ struct Preset
     Chorus chorus;
     bool dirty = false;
 };
+
+/** Limits of each effect parameter */
+struct EffectParams
+{
+    double min;
+    double max;
+    double delta;
+    string name;
+};
+
+
+map <unsigned int,EffectParams> g_mapEffectParams;
+
+void configParams()
+{
+g_mapEffectParams[REVERB_ENABLE].name = "Reverb enable";
+g_mapEffectParams[REVERB_ENABLE].min = 0.0;
+g_mapEffectParams[REVERB_ENABLE].max = 1.0;
+g_mapEffectParams[REVERB_ENABLE].delta = 1.0;
+g_mapEffectParams[REVERB_ROOMSIZE].name = "Reverb roomsize";
+g_mapEffectParams[REVERB_ROOMSIZE].min = 0.0;
+g_mapEffectParams[REVERB_ROOMSIZE].max = 1.2;
+g_mapEffectParams[REVERB_ROOMSIZE].delta = 0.1;
+g_mapEffectParams[REVERB_DAMPING].name = "Reverb damping";
+g_mapEffectParams[REVERB_DAMPING].min = 0.0;
+g_mapEffectParams[REVERB_DAMPING].max = 1.0;
+g_mapEffectParams[REVERB_DAMPING].delta = 0.1;
+g_mapEffectParams[REVERB_WIDTH].name = "Reverb width";
+g_mapEffectParams[REVERB_WIDTH].min = 0.0;
+g_mapEffectParams[REVERB_WIDTH].max = 100.0;
+g_mapEffectParams[REVERB_WIDTH].delta = 5.0;
+g_mapEffectParams[REVERB_LEVEL].name = "Reverb level";
+g_mapEffectParams[REVERB_LEVEL].min = 0.0;
+g_mapEffectParams[REVERB_LEVEL].max = 1.0;
+g_mapEffectParams[REVERB_LEVEL].delta = 0.05;
+g_mapEffectParams[CHORUS_ENABLE].name = "Chorus enable";
+g_mapEffectParams[CHORUS_ENABLE].min = 0.0;
+g_mapEffectParams[CHORUS_ENABLE].max = 1.0;
+g_mapEffectParams[CHORUS_ENABLE].delta = 1.0;
+g_mapEffectParams[CHORUS_VOICES].name = "Chorus voices";
+g_mapEffectParams[CHORUS_VOICES].min = 0.0;
+g_mapEffectParams[CHORUS_VOICES].max = 99.0;
+g_mapEffectParams[CHORUS_VOICES].delta = 1.0;
+g_mapEffectParams[CHORUS_LEVEL].name = "Chorus level";
+g_mapEffectParams[CHORUS_LEVEL].min = 0.0;
+g_mapEffectParams[CHORUS_LEVEL].max = 10.0;
+g_mapEffectParams[CHORUS_LEVEL].delta = 0.05;
+g_mapEffectParams[CHORUS_SPEED].name = "Chorus speed";
+g_mapEffectParams[CHORUS_SPEED].min = 0.1;
+g_mapEffectParams[CHORUS_SPEED].max = 5.0;
+g_mapEffectParams[CHORUS_SPEED].delta = 0.5;
+g_mapEffectParams[CHORUS_DEPTH].name = "Chorus depth";
+g_mapEffectParams[CHORUS_DEPTH].min = 0.0;
+g_mapEffectParams[CHORUS_DEPTH].max = 21.0;
+g_mapEffectParams[CHORUS_DEPTH].delta = 1.0;
+g_mapEffectParams[CHORUS_TYPE].name = "Chorus type";
+g_mapEffectParams[CHORUS_TYPE].min = FLUID_CHORUS_MOD_SINE;
+g_mapEffectParams[CHORUS_TYPE].max = FLUID_CHORUS_MOD_TRIANGLE;
+g_mapEffectParams[CHORUS_TYPE].delta = 1.0;
+}
 
 void showScreen(int nScreen);
 
@@ -303,9 +360,6 @@ bool saveConfig(string sFilename = "./fb.config")
         return false;
     }
 
-    // Save global settings
-    fileConfig << "[global]" << endl;
-
     // Save presets
     for(auto it = g_vPresets.begin(); it != g_vPresets.end(); ++it)
     {
@@ -375,15 +429,17 @@ void power(unsigned int nAction)
 *   @param  nParam Index of the effect parameter
 *   @param  nValue Value of parameter, scaled to 0..70
 */
-void drawEffectValue(unsigned int nParam, unsigned int nValue)
+void drawEffectValue(unsigned int nParam, double dValue)
 {
-    if(g_nCurrentScreen != SCREEN_EDIT_VALUE)
+    if(g_nCurrentScreen != SCREEN_EDIT_VALUE || nParam > 10)
         return;
     g_pScreen->DrawRect(0,16, 159,127, BLACK, 0, BLACK); // clear data area (keep title)
+    unsigned int nValue = (unsigned int)(dValue * (70 / g_mapEffectParams[nParam].max));
     if(nValue > 70)
         nValue = 70;
     unsigned int nX = 10; // x-coord of origin of triangle
     unsigned int nY = 100; // y-coord of origin of triangle
+    g_pScreen->DrawText(g_mapEffectParams[nParam].name, nX, nY + 20);
     if(nParam == CHORUS_TYPE)
     {
         if(nValue == FLUID_CHORUS_MOD_SINE)
@@ -400,28 +456,35 @@ void drawEffectValue(unsigned int nParam, unsigned int nValue)
             g_pScreen->DrawLine(45, 35, 115, 100, DARK_BLUE);
             g_pScreen->DrawLine(115, 100, 150, 67, DARK_BLUE);
         }
+        g_pScreen->DrawText(nValue==FLUID_CHORUS_MOD_SINE?"SINE":"TRIANGLE", 20, 32);
+        return;
     }
-    if(nParam != CHORUS_TYPE)
-        g_pScreen->DrawTriangle(nX, nY, nX + nValue * 2, nY, nX + nValue * 2, nY - nValue, DARK_BLUE, 0, DARK_BLUE);
-    g_pScreen->DrawText(g_asEffecParams[nParam], nX, nY + 20);
+    g_pScreen->DrawTriangle(nX, nY, nX + nValue * 2, nY, nX + nValue * 2, nY - nValue, DARK_BLUE, 0, DARK_BLUE);
+    char sValue[10];
+    sprintf(sValue, "%0.2f", dValue);
+    g_pScreen->DrawText(sValue, 20, 32);
 }
 
 /** Alters the value of an effect parameter
-*   @param  nEffect Index of the effect parameter to alter
+*   @param  nParam Index of the effect parameter to alter
 *   @param  nChange Amount to change value [-1, 0, +1]
+*   @retval double Value of the parameter after adjustment
+*   @note   If nChange is non-zero then screen is drawn with new value
 */
-void adjustEffect(unsigned int nEffect, int nChange)
+double adjustEffect(unsigned int nParam, int nChange = 0)
 {
+    if(nParam > 10)
+        return 0;
     if(nChange)
         setDirty();
-    double dValue, dDelta, dMax, dMin;
+    double dValue;
+    double dMax = g_mapEffectParams[nParam].max;
+    double dMin = g_mapEffectParams[nParam].min;
+    double dDelta = g_mapEffectParams[nParam].delta;
     int nValue;
-    switch(nEffect)
+    switch(nParam)
     {
     case REVERB_DAMPING:
-        dMin = 0.0;
-        dMax = 1.0;
-        dDelta = 0.1;
         dValue = fluid_synth_get_reverb_damp(g_pSynth);
         dValue += nChange * dDelta;
         if(dValue > dMax)
@@ -429,11 +492,9 @@ void adjustEffect(unsigned int nEffect, int nChange)
         else if(dValue < dMin)
             dValue = dMin;
         fluid_synth_set_reverb_damp(g_pSynth, dValue);
+        g_pCurrentPreset->reverb.damping = dValue;
         break;
     case REVERB_LEVEL:
-        dMin = 0.0;
-        dMax = 1.0;
-        dDelta = 0.05;
         dValue = fluid_synth_get_reverb_level(g_pSynth);
         dValue += nChange * dDelta;
         if(dValue > dMax)
@@ -441,11 +502,9 @@ void adjustEffect(unsigned int nEffect, int nChange)
         else if(dValue < dMin)
             dValue = dMin;
         fluid_synth_set_reverb_level(g_pSynth, dValue);
+        g_pCurrentPreset->reverb.level = dValue;
         break;
     case REVERB_ROOMSIZE:
-        dMin = 0.0;
-        dMax = 1.2;
-        dDelta = 0.1;
         dValue = fluid_synth_get_reverb_roomsize(g_pSynth);
         dValue += nChange * dDelta;
         if(dValue > dMax)
@@ -453,11 +512,9 @@ void adjustEffect(unsigned int nEffect, int nChange)
         else if(dValue < dMin)
             dValue = dMin;
         fluid_synth_set_reverb_roomsize(g_pSynth, dValue);
+        g_pCurrentPreset->reverb.roomsize = dValue;
         break;
     case REVERB_WIDTH:
-        dMin = 0.0;
-        dMax = 100.0;
-        dDelta = 5.0;
         dValue = fluid_synth_get_reverb_width(g_pSynth);
         dValue += nChange * dDelta;
         if(dValue > dMax)
@@ -465,11 +522,9 @@ void adjustEffect(unsigned int nEffect, int nChange)
         else if(dValue < dMin)
             dValue = dMin;
         fluid_synth_set_reverb_width(g_pSynth, dValue);
+        g_pCurrentPreset->reverb.width = dValue;
         break;
     case CHORUS_DEPTH:
-        dMin = 0.0;
-        dMax = 21.0;
-        dDelta = 1.0;
         dValue = fluid_synth_get_chorus_depth(g_pSynth);
         dValue += nChange * dDelta;
         if(dValue > dMax)
@@ -477,11 +532,9 @@ void adjustEffect(unsigned int nEffect, int nChange)
         else if(dValue < dMin)
             dValue = dMin;
         fluid_synth_set_chorus_depth(g_pSynth, dValue);
+        g_pCurrentPreset->chorus.depth = dValue;
         break;
     case CHORUS_LEVEL:
-        dMin = 0.0;
-        dMax = 10.0;
-        dDelta = 0.5;
         dValue = fluid_synth_get_chorus_level(g_pSynth);
         dValue += nChange * dDelta;
         if(dValue > dMax)
@@ -489,11 +542,9 @@ void adjustEffect(unsigned int nEffect, int nChange)
         else if(dValue < dMin)
             dValue = dMin;
         fluid_synth_set_chorus_level(g_pSynth, dValue);
+        g_pCurrentPreset->chorus.level = dValue;
         break;
     case CHORUS_SPEED:
-        dMin = 0.1;
-        dMax = 5.0;
-        dDelta = 0.5;
         dValue = fluid_synth_get_chorus_speed(g_pSynth);
         dValue += nChange * dDelta;
         if(dValue > dMax)
@@ -501,22 +552,24 @@ void adjustEffect(unsigned int nEffect, int nChange)
         else if(dValue < dMin)
             dValue = dMin;
         fluid_synth_set_chorus_speed(g_pSynth, dValue);
+        g_pCurrentPreset->chorus.speed = dValue;
         break;
     case CHORUS_TYPE:
+    {
         // min:FLUID_CHORUS_MOD_SINE==0, max:FLUID_CHORUS_MOD_TRIANGLE==1
         if(nChange > 0)
             fluid_synth_set_chorus_type(g_pSynth, FLUID_CHORUS_MOD_TRIANGLE);
         else if(nChange < 0)
             fluid_synth_set_chorus_type(g_pSynth, FLUID_CHORUS_MOD_SINE);
         nValue = fluid_synth_get_chorus_type(g_pSynth);
-        drawEffectValue(nEffect, nValue);
-        g_pScreen->DrawText(nValue==FLUID_CHORUS_MOD_SINE?"SINE":"TRIANGLE", 20, 32);
-        return;
+        g_pCurrentPreset->chorus.type = nValue;
+        string sText = "Chorus type       ";
+        sText += (nValue==FLUID_CHORUS_MOD_SINE)?"SINE":" TRI";
+        g_mapScreens[SCREEN_EFFECTS]->SetEntryText(nParam, sText);
+        return nValue;
         break;
+    }
     case CHORUS_VOICES:
-        dMin = 0.0;
-        dMax = 99.0;
-        dDelta = 1.0;
         dValue = fluid_synth_get_chorus_nr(g_pSynth);
         dValue += nChange * dDelta;
         if(dValue > dMax)
@@ -524,12 +577,19 @@ void adjustEffect(unsigned int nEffect, int nChange)
         else if(dValue < dMin)
             dValue = dMin;
         fluid_synth_set_chorus_nr(g_pSynth, (int)dValue);
+        g_pCurrentPreset->chorus.voicecount = dValue;
         break;
+    default:
+        return 0;
     }
-    drawEffectValue(nEffect, dValue * (70 / dMax));
-    char sValue[10];
-    sprintf(sValue, "%0.2f", dValue);
-    g_pScreen->DrawText(sValue, 20, 32);
+    char sTemp[10];
+    sprintf(sTemp, "%0.2f", dValue);
+    string sValue = sTemp;
+    string sText = g_mapEffectParams[nParam].name;
+    sText.resize(22 - sValue.length(), ' ');
+    sText += sValue;
+    g_mapScreens[SCREEN_EFFECTS]->SetEntryText(nParam, sText);
+    return dValue;
 }
 
 /**  Set enable or disable an effect
@@ -647,10 +707,13 @@ void drawMixerChannel(unsigned int nChannel, int nLevel = -1)
     if(nLevel < 0)
         nLevel = 0;
     nLevel = (nLevel * 100) / 127;
-    g_pScreen->DrawRect(nChannel * 10, 20, nChannel * 10 + 9, 120, WHITE, 1, BLACK); // Frame for fader
+    g_pScreen->DrawRect(nChannel * 10, 19, nChannel * 10 + 9, 121, GREY, 1, BLACK); // Frame for fader
     g_pScreen->DrawRect(nChannel * 10 + 1, 120, nChannel * 10 + 8, 120 - nLevel, DARK_GREEN, 0, DARK_GREEN); // Fader
-    g_pScreen->DrawRect(0,127, 159,121, BLACK, 0, BLACK); // Frame for selection highlight
-    g_pScreen->DrawRect(g_nCurrentChannel * 10, 124, g_nCurrentChannel * 10 + 10,121, BLUE, 0, BLUE); // Selection highlight
+    g_pScreen->DrawRect(0,127, 159,122, BLACK, 0, BLACK); // Frame for selection highlight
+    g_pScreen->DrawRect(g_nCurrentChannel * 10, 124, g_nCurrentChannel * 10 + 10,122, BLUE, 0, BLUE); // Selection highlight
+    g_pScreen->SetFont(10);
+    g_pScreen->DrawText(to_string(nChannel + 1), nChannel * 10 + 9, 121, GREY, 90);
+    g_pScreen->SetFont(16, 12);
 }
 
 /** Draw preset name screen
@@ -688,14 +751,16 @@ void showScreen(int nScreen)
     if(nScreen == SCREEN_MIXER)
     {
         for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
+        {
             drawMixerChannel(nChannel);
+        }
     }
     else if(nScreen == SCREEN_PRESET_NAME)
     {
         drawPresetName();
     }
     else if(nScreen == SCREEN_EDIT_VALUE)
-        adjustEffect(g_nCurrentEffect, 0);
+        drawEffectValue(g_nCurrentEffect, adjustEffect(g_nCurrentEffect, 0));
 }
 
 void save(int)
@@ -848,7 +913,7 @@ bool loadConfig(string sFilename = "./fb.config")
                 if(sParam.substr(7) == "depth")
                     pPreset->chorus.depth = validateDouble(sValue, 0.0, 21.0);
                 if(sParam.substr(7) == "type")
-                    pPreset->chorus.type = validateInt(sValue, 0, 1);
+                    pPreset->chorus.type = validateInt(sValue, FLUID_CHORUS_MOD_SINE, FLUID_CHORUS_MOD_TRIANGLE);
             }
         }
         if(!g_pCurrentPreset)
@@ -892,8 +957,12 @@ bool selectPreset(Preset* pPreset)
     bool bSoundfontChanged = (g_pCurrentPreset && pPreset->soundfont != g_pCurrentPreset->soundfont);
     g_pCurrentPreset = pPreset;
     g_mapScreens[SCREEN_PERFORMANCE]->SetSelection(getPresetIndex(g_pCurrentPreset));
+    fluid_synth_set_reverb(g_pSynth, pPreset->reverb.roomsize, pPreset->reverb.damping, pPreset->reverb.width, pPreset->reverb.level);
     enableEffect(REVERB_ENABLE, g_pCurrentPreset->reverb.enable);
+    fluid_synth_set_chorus(g_pSynth, pPreset->chorus.voicecount,  pPreset->chorus.level,  pPreset->chorus.speed,  pPreset->chorus.depth,  pPreset->chorus.type);
     enableEffect(CHORUS_ENABLE, g_pCurrentPreset->chorus.enable);
+    for(unsigned int nParam = REVERB_ENABLE; nParam <= CHORUS_TYPE; ++nParam)
+        adjustEffect(nParam);
     if(bSoundfontChanged || g_nCurrentSoundfont < 0)
         if(!loadSoundfont(pPreset->soundfont))
             return false;
@@ -909,7 +978,7 @@ bool selectPreset(Preset* pPreset)
 /** Create a new preset object
 *   @retval Preset* Pointer to the new preset object
 */
-Preset* CreatePreset()
+Preset* createPreset()
 {
     //!@todo Insert new preset at current position
     Preset* pPreset = new Preset;
@@ -928,7 +997,7 @@ bool copyPreset(Preset* pSrc, Preset* pDst = NULL)
     if(getPresetIndex(pSrc) < 0)
         return false;
     if(getPresetIndex(pDst) < 0)
-        pDst = CreatePreset();
+        pDst = createPreset();
     for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
     {
         pDst->program[nChannel].program = pSrc->program[nChannel].program;
@@ -957,7 +1026,7 @@ bool copyPreset(Preset* pSrc, Preset* pDst = NULL)
 /** Handle newPreset event */
 void newPreset(unsigned int)
 {
-    selectPreset(CreatePreset());
+    selectPreset(createPreset());
     showScreen(SCREEN_PERFORMANCE);
 }
 
@@ -1082,10 +1151,10 @@ void onButton(unsigned int nButton)
         switch(nButton)
         {
         case BUTTON_DOWN:
-            adjustEffect(g_nCurrentEffect, -1);
+            drawEffectValue(g_nCurrentEffect, adjustEffect(g_nCurrentEffect, -1));
             break;
         case BUTTON_UP:
-            adjustEffect(g_nCurrentEffect, 1);
+            drawEffectValue(g_nCurrentEffect, adjustEffect(g_nCurrentEffect, 1));
             break;
         case BUTTON_LEFT:
         case BUTTON_RIGHT:
@@ -1168,8 +1237,9 @@ int main(int argc, char** argv)
     printf("riban fluidbox\n");
     g_pScreen = new ribanfblib("/dev/fb1");
     g_pScreen->LoadBitmap("logo.bmp", "logo");
-    g_pScreen->SetFont(16, 12, "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf");
     showScreen(SCREEN_LOGO);
+    g_pScreen->SetFont(16, 12, "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf");
+    configParams();
 
     system("gpio mode 26 pwm");
     system("gpio pwm 26 900");
@@ -1230,14 +1300,14 @@ int main(int argc, char** argv)
     signal(SIGTERM, onSignal);
     cout << "Configured signal handler" << endl;
 
-    g_mapScreens[SCREEN_PERFORMANCE] = new ListScreen(g_pScreen, "  riban Fluidbox", SCREEN_NONE);
+    g_mapScreens[SCREEN_PERFORMANCE] = new ListScreen(g_pScreen, "   riban Fluidbox", SCREEN_NONE);
     g_mapScreens[SCREEN_EDIT_PRESET] = new ListScreen(g_pScreen, "Edit Preset", SCREEN_EDIT);
     g_mapScreens[SCREEN_EDIT] = new ListScreen(g_pScreen, "Edit", SCREEN_PERFORMANCE);
     g_mapScreens[SCREEN_POWER] = new ListScreen(g_pScreen, "Power", SCREEN_PERFORMANCE);
     g_mapScreens[SCREEN_PRESET_NAME] = new ListScreen(g_pScreen, "Preset Name", SCREEN_EDIT_PRESET);
     g_mapScreens[SCREEN_PRESET_SF] = new ListScreen(g_pScreen, "Preset Soundfont", SCREEN_EDIT_PRESET);
     g_mapScreens[SCREEN_PRESET_PROGRAM] = new ListScreen(g_pScreen,  "Preset Program", SCREEN_EDIT_PRESET);
-    g_mapScreens[SCREEN_EFFECTS] = new ListEditScreen(g_pScreen, "Effects", SCREEN_EDIT);
+    g_mapScreens[SCREEN_EFFECTS] = new ListScreen(g_pScreen, "Effects", SCREEN_EDIT);
     g_mapScreens[SCREEN_MIXER] = new ListScreen(g_pScreen,  "Mixer", SCREEN_EDIT);
     g_mapScreens[SCREEN_SOUNDFONT] = new ListScreen(g_pScreen, "Soundfont", SCREEN_EDIT);
     g_mapScreens[SCREEN_EDIT_VALUE] = new ListScreen(g_pScreen, "Set Value", SCREEN_EFFECTS);
@@ -1276,7 +1346,7 @@ int main(int argc, char** argv)
 
     // Select preset
     if(g_vPresets.size() == 0)
-        newPreset(0);
+        g_pCurrentPreset = createPreset();
     refreshPresetList();
     selectPreset(g_pCurrentPreset);
 

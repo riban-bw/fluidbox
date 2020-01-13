@@ -3,9 +3,9 @@
 
 #include "ribanfblib/ribanfblib.h"
 
-#define TITLE_BG DARK_RED
+#define TITLE_BG PURPLE
 #define TITLE_FG WHITE
-#define SELECT_BG BLUE
+#define SELECT_BG DARK_BLUE
 #define ENTRY_FG WHITE
 #define DISABLED_FG GREY
 
@@ -80,7 +80,7 @@ public:
     {
         m_pScreen->Clear();
         m_pScreen->DrawRect(0,0, 160,16, TITLE_BG, 0, TITLE_BG);
-        m_pScreen->DrawText(m_sTitle, 5, 14, TITLE_FG);
+        m_pScreen->DrawText(m_sTitle, 5, 13, TITLE_FG);
         if(!m_vEntries.size())
             return;
 

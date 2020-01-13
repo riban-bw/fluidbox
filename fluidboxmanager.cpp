@@ -193,6 +193,8 @@ int main(int argc, char** argv)
             }
         }
     }
+    else
+        cout << "Fluidbox manager not found any updates on USB" << endl;
 
     //!@todo Should we delete framebuffer before opening app?
     cout << "Launching fluidbox..." << endl;

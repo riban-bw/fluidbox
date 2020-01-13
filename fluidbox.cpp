@@ -6,6 +6,10 @@
 #include <cstdio> //provides printf
 #include <iostream> //provides streams
 #include <fstream> //provides file stream
+#include <sys/stat.h> // provides stat for file detection
+#include <fcntl.h>   // open
+#include <unistd.h>  // read, write, close
+#include <dirent.h> //provides directory management
 #include <unistd.h> //provides pause, alarm
 #include <signal.h> //provides signal handling
 #include <vector>
@@ -52,7 +56,9 @@ enum SCREEN_ID
     SCREEN_EDIT_VALUE,
     SCREEN_MIXER,
     SCREEN_SOUNDFONT,
+    SCREEN_SOUNDFONT_LIST,
     SCREEN_REBOOT,
+    SCREEN_ALERT,
     SCREEN_EOL
 };
 
@@ -84,6 +90,14 @@ enum EFFECT_PARAM
     CHORUS_SPEED,
     CHORUS_DEPTH,
     CHORUS_TYPE
+};
+
+enum SOUNDFONT_ACTION
+{
+    SF_ACTION_NONE,
+    SF_ACTION_COPY,
+    SF_ACTION_DELETE,
+    SF_ACTION_SELECT
 };
 
 /** MIDI program parameters */
@@ -140,53 +154,6 @@ struct EffectParams
 
 map <unsigned int,EffectParams> g_mapEffectParams;
 
-void configParams()
-{
-g_mapEffectParams[REVERB_ENABLE].name = "Reverb enable";
-g_mapEffectParams[REVERB_ENABLE].min = 0.0;
-g_mapEffectParams[REVERB_ENABLE].max = 1.0;
-g_mapEffectParams[REVERB_ENABLE].delta = 1.0;
-g_mapEffectParams[REVERB_ROOMSIZE].name = "Reverb roomsize";
-g_mapEffectParams[REVERB_ROOMSIZE].min = 0.0;
-g_mapEffectParams[REVERB_ROOMSIZE].max = 1.2;
-g_mapEffectParams[REVERB_ROOMSIZE].delta = 0.1;
-g_mapEffectParams[REVERB_DAMPING].name = "Reverb damping";
-g_mapEffectParams[REVERB_DAMPING].min = 0.0;
-g_mapEffectParams[REVERB_DAMPING].max = 1.0;
-g_mapEffectParams[REVERB_DAMPING].delta = 0.1;
-g_mapEffectParams[REVERB_WIDTH].name = "Reverb width";
-g_mapEffectParams[REVERB_WIDTH].min = 0.0;
-g_mapEffectParams[REVERB_WIDTH].max = 100.0;
-g_mapEffectParams[REVERB_WIDTH].delta = 5.0;
-g_mapEffectParams[REVERB_LEVEL].name = "Reverb level";
-g_mapEffectParams[REVERB_LEVEL].min = 0.0;
-g_mapEffectParams[REVERB_LEVEL].max = 1.0;
-g_mapEffectParams[REVERB_LEVEL].delta = 0.05;
-g_mapEffectParams[CHORUS_ENABLE].name = "Chorus enable";
-g_mapEffectParams[CHORUS_ENABLE].min = 0.0;
-g_mapEffectParams[CHORUS_ENABLE].max = 1.0;
-g_mapEffectParams[CHORUS_ENABLE].delta = 1.0;
-g_mapEffectParams[CHORUS_VOICES].name = "Chorus voices";
-g_mapEffectParams[CHORUS_VOICES].min = 0.0;
-g_mapEffectParams[CHORUS_VOICES].max = 99.0;
-g_mapEffectParams[CHORUS_VOICES].delta = 1.0;
-g_mapEffectParams[CHORUS_LEVEL].name = "Chorus level";
-g_mapEffectParams[CHORUS_LEVEL].min = 0.0;
-g_mapEffectParams[CHORUS_LEVEL].max = 10.0;
-g_mapEffectParams[CHORUS_LEVEL].delta = 0.05;
-g_mapEffectParams[CHORUS_SPEED].name = "Chorus speed";
-g_mapEffectParams[CHORUS_SPEED].min = 0.1;
-g_mapEffectParams[CHORUS_SPEED].max = 5.0;
-g_mapEffectParams[CHORUS_SPEED].delta = 0.5;
-g_mapEffectParams[CHORUS_DEPTH].name = "Chorus depth";
-g_mapEffectParams[CHORUS_DEPTH].min = 0.0;
-g_mapEffectParams[CHORUS_DEPTH].max = 21.0;
-g_mapEffectParams[CHORUS_DEPTH].delta = 1.0;
-g_mapEffectParams[CHORUS_TYPE].name = "Chorus type";
-g_mapEffectParams[CHORUS_TYPE].min = FLUID_CHORUS_MOD_SINE;
-g_mapEffectParams[CHORUS_TYPE].max = FLUID_CHORUS_MOD_TRIANGLE;
-g_mapEffectParams[CHORUS_TYPE].delta = 1.0;
-}
 
 void showScreen(int nScreen);
 
@@ -209,7 +176,57 @@ unsigned int g_nCurrentChannel = 0; // Selected channel, e.g. within mixer scree
 unsigned int g_nCurrentChar = 0; // Index of highlighted character in name edit
 unsigned int g_nCurrentEffect;
 bool g_bDirty = false;// True if configuration needs to be saved
+SOUNDFONT_ACTION g_nSoundfontAction = SF_ACTION_NONE;
+function<void(void)> g_pAlertCallback = NULL;
 
+/**   Populate effect parameter data */
+void configParams()
+{
+    g_mapEffectParams[REVERB_ENABLE].name = "Reverb enable";
+    g_mapEffectParams[REVERB_ENABLE].min = 0.0;
+    g_mapEffectParams[REVERB_ENABLE].max = 1.0;
+    g_mapEffectParams[REVERB_ENABLE].delta = 1.0;
+    g_mapEffectParams[REVERB_ROOMSIZE].name = "Reverb roomsize";
+    g_mapEffectParams[REVERB_ROOMSIZE].min = 0.0;
+    g_mapEffectParams[REVERB_ROOMSIZE].max = 1.2;
+    g_mapEffectParams[REVERB_ROOMSIZE].delta = 0.1;
+    g_mapEffectParams[REVERB_DAMPING].name = "Reverb damping";
+    g_mapEffectParams[REVERB_DAMPING].min = 0.0;
+    g_mapEffectParams[REVERB_DAMPING].max = 1.0;
+    g_mapEffectParams[REVERB_DAMPING].delta = 0.1;
+    g_mapEffectParams[REVERB_WIDTH].name = "Reverb width";
+    g_mapEffectParams[REVERB_WIDTH].min = 0.0;
+    g_mapEffectParams[REVERB_WIDTH].max = 100.0;
+    g_mapEffectParams[REVERB_WIDTH].delta = 5.0;
+    g_mapEffectParams[REVERB_LEVEL].name = "Reverb level";
+    g_mapEffectParams[REVERB_LEVEL].min = 0.0;
+    g_mapEffectParams[REVERB_LEVEL].max = 1.0;
+    g_mapEffectParams[REVERB_LEVEL].delta = 0.05;
+    g_mapEffectParams[CHORUS_ENABLE].name = "Chorus enable";
+    g_mapEffectParams[CHORUS_ENABLE].min = 0.0;
+    g_mapEffectParams[CHORUS_ENABLE].max = 1.0;
+    g_mapEffectParams[CHORUS_ENABLE].delta = 1.0;
+    g_mapEffectParams[CHORUS_VOICES].name = "Chorus voices";
+    g_mapEffectParams[CHORUS_VOICES].min = 0.0;
+    g_mapEffectParams[CHORUS_VOICES].max = 99.0;
+    g_mapEffectParams[CHORUS_VOICES].delta = 1.0;
+    g_mapEffectParams[CHORUS_LEVEL].name = "Chorus level";
+    g_mapEffectParams[CHORUS_LEVEL].min = 0.0;
+    g_mapEffectParams[CHORUS_LEVEL].max = 10.0;
+    g_mapEffectParams[CHORUS_LEVEL].delta = 1.0;
+    g_mapEffectParams[CHORUS_SPEED].name = "Chorus speed";
+    g_mapEffectParams[CHORUS_SPEED].min = 0.1;
+    g_mapEffectParams[CHORUS_SPEED].max = 5.0;
+    g_mapEffectParams[CHORUS_SPEED].delta = 0.5;
+    g_mapEffectParams[CHORUS_DEPTH].name = "Chorus depth";
+    g_mapEffectParams[CHORUS_DEPTH].min = 0.0;
+    g_mapEffectParams[CHORUS_DEPTH].max = 21.0;
+    g_mapEffectParams[CHORUS_DEPTH].delta = 1.0;
+    g_mapEffectParams[CHORUS_TYPE].name = "Chorus type";
+    g_mapEffectParams[CHORUS_TYPE].min = FLUID_CHORUS_MOD_SINE;
+    g_mapEffectParams[CHORUS_TYPE].max = FLUID_CHORUS_MOD_TRIANGLE;
+    g_mapEffectParams[CHORUS_TYPE].delta = 1.0;
+}
 /**     Return a converted and vaildated value
 *       @param sValue Value as a string
 *       @param min Minimum permitted value
@@ -265,6 +282,14 @@ string toLower(string sString)
     for(size_t i=0; i<sString.length(); ++i)
         sReturn += tolower(sString[i]);
     return sReturn;
+}
+
+/** Check if USB storage is mounted
+*   retval bool True if mounted
+*/
+bool isUsbMounted()
+{
+    return (system("mount | grep /media/usb > /dev/null") ==0);
 }
 
 /** Get the index of a preset
@@ -327,8 +352,7 @@ void refreshPresetList()
         sName += pPreset->name;
         g_mapScreens[SCREEN_PERFORMANCE]->Add(sName, showScreen, SCREEN_EDIT);
     }
-    if(g_mapScreens[SCREEN_PERFORMANCE]->GetSelection() >= g_mapScreens.size())
-    g_mapScreens[SCREEN_PERFORMANCE]->SetSelection(g_mapScreens.size() - 1);
+    g_mapScreens[SCREEN_PERFORMANCE]->SetSelection(g_mapScreens[SCREEN_PERFORMANCE]->GetSelection()); // Sets to end if overrun
 }
 
 /*   Set the dirty flag of a preset
@@ -439,7 +463,6 @@ void drawEffectValue(unsigned int nParam, double dValue)
         nValue = 70;
     unsigned int nX = 10; // x-coord of origin of triangle
     unsigned int nY = 100; // y-coord of origin of triangle
-    g_pScreen->DrawText(g_mapEffectParams[nParam].name, nX, nY + 20);
     if(nParam == CHORUS_TYPE)
     {
         if(nValue == FLUID_CHORUS_MOD_SINE)
@@ -456,13 +479,13 @@ void drawEffectValue(unsigned int nParam, double dValue)
             g_pScreen->DrawLine(45, 35, 115, 100, DARK_BLUE);
             g_pScreen->DrawLine(115, 100, 150, 67, DARK_BLUE);
         }
-        g_pScreen->DrawText(nValue==FLUID_CHORUS_MOD_SINE?"SINE":"TRIANGLE", 20, 32);
+        g_pScreen->DrawText(nValue==FLUID_CHORUS_MOD_SINE?"SINE":"TRIANGLE", nX, nY + 20);
         return;
     }
     g_pScreen->DrawTriangle(nX, nY, nX + nValue * 2, nY, nX + nValue * 2, nY - nValue, DARK_BLUE, 0, DARK_BLUE);
     char sValue[10];
     sprintf(sValue, "%0.2f", dValue);
-    g_pScreen->DrawText(sValue, 20, 32);
+    g_pScreen->DrawText(sValue, nX, nY + 20);
 }
 
 /** Alters the value of an effect parameter
@@ -620,7 +643,7 @@ void enableEffect(unsigned int nEffect, bool bEnable = true)
         return;
     for(unsigned int nIndex = nEffect + 1; nIndex < (nEffect==REVERB_ENABLE?5:12); ++nIndex)
         g_mapScreens[SCREEN_EFFECTS]->Enable(nIndex, bEnable);
-    sText += bEnable?"enabled":"disabled";
+    sText += bEnable?"        Enabled":"       Disabled";
     g_mapScreens[SCREEN_EFFECTS]->SetEntryText(nEffect, sText);
 }
 
@@ -725,42 +748,242 @@ void drawPresetName()
     g_pScreen->DrawRect(7 + g_nCurrentChar * 7, 71, 14 + g_nCurrentChar * 7, 72, BLACK, 0, BLUE);
 }
 
+/** Handle "manage soundfont" events
+*   @param nAction Action to take on selected soundfont
+*/
+void listSoundfont(int nAction)
+{
+    g_nSoundfontAction = (SOUNDFONT_ACTION)nAction;
+    showScreen(SCREEN_SOUNDFONT_LIST);
+}
+
+/** Copy a file
+*   sSource Full path and filename of file to copy
+*   sDest Full path and filename of new file
+*/
+void copyFile(string sSource, string sDest)
+{
+    int nSrc = open(sSource.c_str(), O_RDONLY, 0);
+    if(nSrc == -1)
+        return;
+    int nDst = open(sDest.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR); //!@todo File is created with wrong permissions
+    if(nDst == -1)
+    {
+        close(nSrc);
+        return;
+    }
+    struct stat fileStat;
+    stat(sSource.c_str(), &fileStat);
+    if(fileStat.st_blocks < 1)
+    {
+        close(nSrc);
+        close(nDst);
+        return;
+    }
+    size_t nBlocks = fileStat.st_blocks * 512 / fileStat.st_blksize; // Quantity of blocks based on file system block size
+    float fX = 0;
+    float fDx =  159.0 / nBlocks;
+    int nX = 0;
+    char* pBuffer = (char*)malloc(sizeof(char)*fileStat.st_blksize);
+    g_pScreen->DrawRect(0,100, 159,127, WHITE, 1, GREY);
+    size_t nSize;
+    while(g_nRunState && ((nSize = read(nSrc, pBuffer, fileStat.st_blksize)) > 0))
+    {
+        write(nDst, pBuffer, nSize);
+        // Update progress bar
+        fX += fDx;
+        if(int(fX) > nX)
+        {
+            nX = fX;
+            g_pScreen->DrawRect(0,100, nX,127, WHITE, 1, GREEN);
+        }
+    }
+    g_pScreen->DrawText("Flushing file...", 5, 120, BLACK);
+    close(nDst); // There is a delay whilst file is flushed to disk
+    close(nSrc);
+    free(pBuffer);
+}
+
+/** Delete file selected in soundfont file list */
+void deleteFile()
+{
+    string sCommand = "sudo rm sf2/'";
+    sCommand += g_mapScreens[SCREEN_SOUNDFONT_LIST]->GetEntryText(g_mapScreens[SCREEN_SOUNDFONT_LIST]->GetSelection());
+    sCommand += "'";
+    system(sCommand.c_str());
+    cout << sCommand << endl;
+}
+
+/** Show an alert
+*   @param sMessage Message to display (limit to single 20 char line)
+*   @param sTitle Title to display at top of alert
+*   @param pFunction Pointer to a function to call if RIGHT / SELECT / ENTER button pressed - Default: None
+*   @param nTimeout Period in seconds before alert clears - Default: 0, no timeout
+*   @note  Pressing LEFT / CANCEL button clears the alert
+*   @note  Callback must be in form: void function()
+*/
+void alert(string sMessage, string sTitle = "    ALERT", function<void(void)> pFunction = NULL, unsigned int nTimeout = 0)
+{
+    g_mapScreens[SCREEN_ALERT]->SetTitle(sTitle);
+    showScreen(SCREEN_ALERT);
+    uint32_t nColour = ribanfblib::GetColour32(200, 150, 50);
+    g_pScreen->DrawRect(0,16,159,127, nColour, 0, nColour);
+    g_pScreen->DrawText(sMessage, 5, 55); //!@todo Allow multiline alert messages
+    g_pScreen->DrawCircle(25,100, 20, WHITE, 1, DARK_RED);
+    g_pScreen->DrawCircle(134,100, 20, WHITE, 1, DARK_BLUE);
+    g_pScreen->SetFont(16);
+    g_pScreen->DrawText("NO", 16, 107, WHITE);
+    g_pScreen->DrawText("YES", 119, 107,  WHITE);
+    g_pScreen->SetFont(16, 12);
+    g_pAlertCallback = pFunction;
+    if(nTimeout)
+        alarm(nTimeout);
+}
+
+/** Loads a soundfont from file, unloading previously loaded soundfont */
+bool loadSoundfont(string sFilename)
+{
+    if(g_nCurrentSoundfont >= 0)
+    {
+        fluid_synth_sfunload(g_pSynth, g_nCurrentSoundfont, 0);
+        g_nCurrentSoundfont = -1;
+    }
+    string sPath = SF_ROOT;
+    sPath += sFilename;
+    g_pScreen->DrawRect(2,100, 157,124, DARK_BLUE, 5, DARK_BLUE, QUADRANT_ALL, 5);
+    g_pScreen->DrawText("Loading soundfont", 4, 118, WHITE);
+    g_nCurrentSoundfont = fluid_synth_sfload(g_pSynth, sPath.c_str(), 1);
+    if(g_nCurrentSoundfont >= 0)
+    {
+        g_pCurrentPreset->soundfont = sFilename;
+    }
+    showScreen(g_nCurrentScreen);
+    return (g_nCurrentSoundfont >= 0);
+}
+
+void onSelectSoundfont(int nAction)
+{
+    string sFilename = g_mapScreens[SCREEN_SOUNDFONT_LIST]->GetEntryText();
+    string sCommand;
+    switch(nAction)
+    {
+    case SF_ACTION_COPY:
+    {
+        string sSrc = "/media/usb/";
+        sSrc += sFilename;
+        string sDst = "sf2/";
+        sDst += sFilename;
+        copyFile(sSrc, sDst);
+        showScreen(g_mapScreens[SCREEN_SOUNDFONT_LIST]->GetPreviousScreen());
+        break;
+    }
+    case SF_ACTION_DELETE:
+        //!@todo Validate file should be deleted, e.g. is it in use?
+        alert(sFilename, " **CONFIRM DELETE**", deleteFile, 5);
+        break;
+    case SF_ACTION_SELECT:
+        if(sFilename[0] == '~')
+            sFilename = "default/" + sFilename.substr(1);
+        loadSoundfont(sFilename);
+        break;
+    }
+}
+
+void populateSoundfontList()
+{
+    DIR *dir;
+    struct dirent *ent;
+
+    ListScreen* pScreen = g_mapScreens[SCREEN_SOUNDFONT_LIST];
+    pScreen->ClearList();
+    vector<string> vPaths;
+
+    switch(g_nSoundfontAction)
+    {
+    case SF_ACTION_COPY:
+        vPaths.push_back("/media/usb");
+        pScreen->SetTitle("Copy soundfont");
+        break;
+    case SF_ACTION_DELETE:
+        vPaths.push_back("sf2");
+        pScreen->SetTitle("Delete soundfont");
+        break;
+    case SF_ACTION_SELECT:
+        vPaths.push_back("sf2");
+        vPaths.push_back("sf2/default");
+        pScreen->SetTitle("Select soundfont");
+        break;
+    }
+    for(auto it = vPaths.begin(); it != vPaths.end(); ++it)
+    {
+        if((dir = opendir((*it).c_str())) != NULL)
+        {
+            while((ent = readdir(dir)) != NULL)
+            {
+                string sFilename = ent->d_name;
+                if(sFilename.length() < 4 || toLower(sFilename.substr(sFilename.length() - 4, 4)) != ".sf2")
+                    continue; // not the sf2 file we are looking for...
+                if((*it) == "sf2/default")
+                    sFilename = "~" + sFilename;
+                pScreen->Add(sFilename, onSelectSoundfont, g_nSoundfontAction);
+            }
+        }
+    }
+}
+
 /** Display the requested screen
     @param pScreen Pointer to the screen to display
 */
 void showScreen(int nScreen)
 {
-    if(nScreen == SCREEN_NONE)
-        return;
+    // Handle non-ListScreen screens
     if(nScreen == SCREEN_LOGO)
     {
         g_pScreen->DrawBitmap("logo", 0, 0);
         g_nCurrentScreen = SCREEN_LOGO;
         return;
     }
+
+    // Check the ListScreen exists
     auto it = g_mapScreens.find(nScreen);
     if(it == g_mapScreens.end())
         return;
-    if(nScreen == SCREEN_PERFORMANCE)
+    ListScreen* pScreen = it->second;
+
+    // Action before showing ListScreen
+    switch(nScreen)
     {
-        it->second->SetSelection(getPresetIndex(g_pCurrentPreset));
+    case SCREEN_PERFORMANCE:
+        pScreen->SetSelection(getPresetIndex(g_pCurrentPreset));
+        break;
+    case SCREEN_EDIT_VALUE:
+        g_mapScreens[SCREEN_EDIT_VALUE]->SetTitle(g_mapEffectParams[g_nCurrentEffect].name);
+        break;
+    case SCREEN_SOUNDFONT:
+        g_nSoundfontAction = SF_ACTION_NONE;
+        break;
+    case SCREEN_SOUNDFONT_LIST:
+        populateSoundfontList();
     }
-    it->second->Draw();
-    it->second->SetPreviousScreen(g_nCurrentScreen);
+    pScreen->Draw();
+    if(g_nCurrentScreen != nScreen)
+        pScreen->SetPreviousScreen(g_nCurrentScreen);
     g_nCurrentScreen = nScreen;
-    if(nScreen == SCREEN_MIXER)
+
+    // Action after showing ListScreen
+    switch(nScreen)
     {
+    case SCREEN_MIXER:
         for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
-        {
             drawMixerChannel(nChannel);
-        }
-    }
-    else if(nScreen == SCREEN_PRESET_NAME)
-    {
+        break;
+    case SCREEN_PRESET_NAME:
         drawPresetName();
-    }
-    else if(nScreen == SCREEN_EDIT_VALUE)
+        break;
+    case SCREEN_EDIT_VALUE:
         drawEffectValue(g_nCurrentEffect, adjustEffect(g_nCurrentEffect, 0));
+        break;
+    }
 }
 
 void save(int)
@@ -923,27 +1146,6 @@ bool loadConfig(string sFilename = "./fb.config")
     return true;
 }
 
-/** Loads a soundfont from file, unloading previously loaded soundfont */
-bool loadSoundfont(string sFilename)
-{
-    if(g_nCurrentSoundfont >= 0)
-    {
-        fluid_synth_sfunload(g_pSynth, g_nCurrentSoundfont, 0);
-        g_nCurrentSoundfont = -1;
-    }
-    string sPath = SF_ROOT;
-    sPath += sFilename;
-    g_pScreen->DrawRect(2,100, 157,124, DARK_BLUE, 5, DARK_BLUE, QUADRANT_ALL, 5);
-    g_pScreen->DrawText("Loading soundfont", 4, 118, WHITE);
-    g_nCurrentSoundfont = fluid_synth_sfload(g_pSynth, sPath.c_str(), 1);
-    if(g_nCurrentSoundfont >= 0)
-    {
-        g_pCurrentPreset->soundfont = sFilename;
-    }
-    showScreen(g_nCurrentScreen);
-    return (g_nCurrentSoundfont >= 0);
-}
-
 /** Select a preset
 *   @param pPreset Pointer to preset to load
 *   @retval bool True on success
@@ -1039,21 +1241,19 @@ void deletePreset(unsigned int)
         return; // Must have at least one preset
     }
 
-    auto it = g_vPresets.begin();
-    for(; it != g_vPresets.end(); ++it)
-    {
-        if(*(it) == g_pCurrentPreset)
-            break;
-    }
+    auto it = find(g_vPresets.begin(), g_vPresets.end(), g_pCurrentPreset);
     if(it == g_vPresets.end())
         return;
     delete g_pCurrentPreset;
     g_vPresets.erase(it);
-    g_pCurrentPreset = *(--it);
+    if(it == g_vPresets.end())
+        g_pCurrentPreset = g_vPresets[0];
+    else
+        g_pCurrentPreset = *it;
     refreshPresetList();
     selectPreset(g_pCurrentPreset);
     showScreen(SCREEN_PERFORMANCE);
-    g_bDirty = true;
+    g_bDirty = true; //!@ Need method to indicate dirty state
 }
 
 /** Handle navigation buttons
@@ -1066,6 +1266,16 @@ void onButton(unsigned int nButton)
     case SCREEN_LOGO:
     case SCREEN_BLANK:
         showScreen(SCREEN_PERFORMANCE);
+        break;
+    case SCREEN_ALERT:
+        if(nButton == BUTTON_LEFT)
+            showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
+        else if(nButton == BUTTON_RIGHT && g_pAlertCallback)
+        {
+            g_pAlertCallback();
+            g_pAlertCallback = NULL;
+            showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
+        }
         break;
     case SCREEN_MIXER:
         switch(nButton)
@@ -1175,17 +1385,23 @@ void onButton(unsigned int nButton)
             g_mapScreens[g_nCurrentScreen]->Select();
             break;
         case BUTTON_LEFT:
-            if(g_nCurrentScreen == SCREEN_POWER)
-                showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
-            else
+            switch(g_nCurrentScreen)
+            {
+                case SCREEN_POWER:
+                case SCREEN_SOUNDFONT_LIST:
+                    showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
+                    break;
+            default:
                 showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
+            }
             break;
         }
     }
+    int nSelection = g_mapScreens[SCREEN_PERFORMANCE]->GetSelection();
     if(g_nCurrentScreen == SCREEN_PERFORMANCE && (nButton == BUTTON_UP || nButton == BUTTON_DOWN)
-        && g_mapScreens[SCREEN_PERFORMANCE]->GetSelection() >= 0
-        && g_mapScreens[SCREEN_PERFORMANCE]->GetSelection() < g_vPresets.size())
-        selectPreset(g_vPresets[g_mapScreens[SCREEN_PERFORMANCE]->GetSelection()]);
+        && nSelection >= 0
+        && nSelection < g_vPresets.size())
+        selectPreset(g_vPresets[nSelection]);
 }
 
 void onLeftHold(unsigned int nGpio)
@@ -1221,6 +1437,11 @@ void onSignal(int nSignal)
         // We use alarm to drop back to performance screen after idle delay
         if(g_nCurrentScreen == SCREEN_LOGO)
             showScreen(SCREEN_PERFORMANCE);
+        else if(g_nCurrentScreen == SCREEN_ALERT)
+        {
+            g_pAlertCallback = NULL;
+            showScreen(g_mapScreens[SCREEN_ALERT]->GetPreviousScreen());
+        }
         break;
     case SIGINT:
     case SIGTERM:
@@ -1309,8 +1530,10 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_PRESET_PROGRAM] = new ListScreen(g_pScreen,  "Preset Program", SCREEN_EDIT_PRESET);
     g_mapScreens[SCREEN_EFFECTS] = new ListScreen(g_pScreen, "Effects", SCREEN_EDIT);
     g_mapScreens[SCREEN_MIXER] = new ListScreen(g_pScreen,  "Mixer", SCREEN_EDIT);
-    g_mapScreens[SCREEN_SOUNDFONT] = new ListScreen(g_pScreen, "Soundfont", SCREEN_EDIT);
-    g_mapScreens[SCREEN_EDIT_VALUE] = new ListScreen(g_pScreen, "Set Value", SCREEN_EFFECTS);
+    g_mapScreens[SCREEN_SOUNDFONT] = new ListScreen(g_pScreen, "Manage soundfonts", SCREEN_EDIT);
+    g_mapScreens[SCREEN_SOUNDFONT_LIST] = new ListScreen(g_pScreen, "Available soundfonts", SCREEN_SOUNDFONT);
+    g_mapScreens[SCREEN_EDIT_VALUE] = new ListScreen(g_pScreen, "Effect parameter", SCREEN_EFFECTS);
+    g_mapScreens[SCREEN_ALERT] = new ListScreen(g_pScreen, "     ALERT", SCREEN_PERFORMANCE);
 
     g_mapScreens[SCREEN_EDIT]->Add("Mixer", showScreen, SCREEN_MIXER);
     g_mapScreens[SCREEN_EDIT]->Add("Effects", showScreen, SCREEN_EFFECTS);
@@ -1322,7 +1545,7 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_EDIT]->Add("Power", showScreen, SCREEN_POWER);
 
     g_mapScreens[SCREEN_EDIT_PRESET]->Add("Name", showScreen, SCREEN_PRESET_NAME);
-    g_mapScreens[SCREEN_EDIT_PRESET]->Add("Soundfont", showScreen, SCREEN_PRESET_SF);
+    g_mapScreens[SCREEN_EDIT_PRESET]->Add("Soundfont", listSoundfont, SF_ACTION_SELECT);
     g_mapScreens[SCREEN_EDIT_PRESET]->Add("Program", showEditProgram);
 
     g_mapScreens[SCREEN_POWER]->Add("Save and power off", power, POWER_OFF_SAVE);
@@ -1342,6 +1565,9 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_EFFECTS]->Add("Chorus speed", editEffect, CHORUS_SPEED);
     g_mapScreens[SCREEN_EFFECTS]->Add("Chorus depth", editEffect, CHORUS_DEPTH);
     g_mapScreens[SCREEN_EFFECTS]->Add("Chorus type", editEffect, CHORUS_TYPE);
+
+    g_mapScreens[SCREEN_SOUNDFONT]->Add("Copy from USB", listSoundfont, SF_ACTION_COPY);
+    g_mapScreens[SCREEN_SOUNDFONT]->Add("Delete", listSoundfont, SF_ACTION_DELETE);
     cout << "Configured screens" << endl;
 
     // Select preset

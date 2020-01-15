@@ -665,14 +665,12 @@ bool loadSoundfont(string sFilename)
         g_nCurrentSoundfont = -1;
     }
     string sPath = SF_ROOT;
+    if(sFilename[0] == '~')
+        sFilename = "default/" + sFilename.substr(1);
     sPath += sFilename;
     g_pScreen->DrawRect(2,100, 157,124, DARK_BLUE, 5, DARK_BLUE, QUADRANT_ALL, 5);
     g_pScreen->DrawText("Loading soundfont", 4, 118, WHITE);
     g_nCurrentSoundfont = fluid_synth_sfload(g_pSynth, sPath.c_str(), 1);
-    if(g_nCurrentSoundfont >= 0)
-    {
-        g_pCurrentPreset->soundfont = sFilename;
-    }
     showScreen(g_nCurrentScreen);
     return (g_nCurrentSoundfont >= 0);
 }
@@ -698,10 +696,8 @@ void onSelectSoundfont(int nAction)
         alert(sFilename, " **CONFIRM DELETE**", deleteFile, 5);
         break;
     case SF_ACTION_SELECT:
-        if(sFilename[0] == '~')
-            sFilename = "default/" + sFilename.substr(1);
-        loadSoundfont(sFilename);
         g_pCurrentPreset->soundfont=sFilename;
+        loadSoundfont(sFilename);
         setDirty(g_pCurrentPreset);
         break;
     }
@@ -746,7 +742,9 @@ void populateSoundfontList()
                     continue; // not the sf2 file we are looking for...
                 if((*it) == "sf2/default")
                     sFilename = "~" + sFilename;
-                pScreen->Add(sFilename, onSelectSoundfont, g_nSoundfontAction);
+                int nEntry = pScreen->Add(sFilename, onSelectSoundfont, g_nSoundfontAction);
+                if(g_pCurrentPreset->soundfont == sFilename)
+                    pScreen->SetSelection(nEntry);
             }
         }
     }

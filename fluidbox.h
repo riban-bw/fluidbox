@@ -250,9 +250,8 @@ void showMidiActivity(int nChannel);
 
 /** Draw a mixer channel
 *   @param  nChannel MIDI channel [0-15]
-*   @param  nValue MIDI CC7 value to display [0-127] Default: -1: Get value from synth
 */
-void drawMixerChannel(unsigned int nChannel, int nLevel = -1);
+void drawMixerChannel(unsigned int nChannel);
 
 /** Draw preset name screen
 */

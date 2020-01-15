@@ -500,16 +500,13 @@ void showMidiActivity(int nChannel)
         g_pScreen->DrawRect(0,nY+15, 1,nY+15-nCount, RED, 0, RED); // Draw indicator
 }
 
-void drawMixerChannel(unsigned int nChannel, int nLevel)
+void drawMixerChannel(unsigned int nChannel)
 {
+    int nLevel;
     if(g_nCurrentScreen != SCREEN_MIXER || nChannel > 15)
         return;
-    if(nLevel < 0 && (FLUID_FAILED == fluid_synth_get_cc(g_pSynth, nChannel, 7, &nLevel)))
+    if(FLUID_FAILED == fluid_synth_get_cc(g_pSynth, nChannel, 7, &nLevel))
         return;
-    if(nLevel > 127)
-        nLevel = 127;
-    if(nLevel < 0)
-        nLevel = 0;
     nLevel = (nLevel * 100) / 127;
     g_pScreen->DrawRect(nChannel * 10, 19, nChannel * 10 + 9, 121, GREY, 1, BLACK); // Frame for fader
     g_pScreen->DrawRect(nChannel * 10 + 1, 120, nChannel * 10 + 8, 120 - nLevel, DARK_GREEN, 0, DARK_GREEN); // Fader
@@ -789,7 +786,8 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
     case 0xB0: //CONTROL_CHANGE
         if(fluid_midi_event_get_control(pEvent) == 7)
         {
-            drawMixerChannel(nChannel, fluid_midi_event_get_value(pEvent));
+            g_pCurrentPreset->program[nChannel].level = fluid_midi_event_get_value(pEvent);
+            drawMixerChannel(nChannel);
             setDirty();
         }
         break;
@@ -1056,7 +1054,8 @@ void onButton(unsigned int nButton)
                 if(nLevel >= 127)
                     return;
                 fluid_synth_cc(g_pSynth, g_nCurrentChannel, 7, ++nLevel);
-                drawMixerChannel(g_nCurrentChannel, nLevel);
+                drawMixerChannel(g_nCurrentChannel);
+                g_pCurrentPreset->program[g_nCurrentChannel].level = nLevel;
                 setDirty();
                 break;
             }
@@ -1068,7 +1067,8 @@ void onButton(unsigned int nButton)
                 if(nLevel < 1)
                     return;
                 fluid_synth_cc(g_pSynth, g_nCurrentChannel, 7, --nLevel);
-                drawMixerChannel(g_nCurrentChannel, nLevel);
+                drawMixerChannel(g_nCurrentChannel);
+                g_pCurrentPreset->program[g_nCurrentChannel].level = nLevel;
                 setDirty();
                 break;
             }

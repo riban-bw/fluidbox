@@ -1240,14 +1240,8 @@ void newPreset(unsigned int)
 }
 
 /**  Delete the currently selected preset */
-void deletePreset(unsigned int)
+void deletePreset()
 {
-    if(g_vPresets.size() == 1)
-    {
-        showScreen(SCREEN_PERFORMANCE);
-        return; // Must have at least one preset
-    }
-
     auto it = find(g_vPresets.begin(), g_vPresets.end(), g_pCurrentPreset);
     if(it == g_vPresets.end())
         return;
@@ -1261,6 +1255,21 @@ void deletePreset(unsigned int)
     selectPreset(g_pCurrentPreset);
     showScreen(SCREEN_PERFORMANCE);
     g_bDirty = true; //!@ Need method to indicate dirty state
+}
+
+/**  Handle request to delete the currently selected preset */
+void requestDeletePreset(unsigned int)
+{
+    if(g_vPresets.size() == 1)
+    {
+        showScreen(SCREEN_PERFORMANCE);
+        return; // Must have at least one preset
+    }
+
+    auto it = find(g_vPresets.begin(), g_vPresets.end(), g_pCurrentPreset);
+    if(it == g_vPresets.end())
+        return;
+    alert((*it)->name, "  **DELETE PRESET**", deletePreset);
 }
 
 /** Handle navigation buttons
@@ -1538,7 +1547,7 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_EDIT]->Add("Effects", showScreen, SCREEN_EFFECTS);
     g_mapScreens[SCREEN_EDIT]->Add("Edit preset", showScreen, SCREEN_EDIT_PRESET);
     g_mapScreens[SCREEN_EDIT]->Add("New preset", newPreset);
-    g_mapScreens[SCREEN_EDIT]->Add("Delete preset", deletePreset);
+    g_mapScreens[SCREEN_EDIT]->Add("Delete preset", requestDeletePreset);
     g_mapScreens[SCREEN_EDIT]->Add("Manage soundfonts", showScreen, SCREEN_SOUNDFONT);
     g_mapScreens[SCREEN_EDIT]->Add("Save", save);
     g_mapScreens[SCREEN_EDIT]->Add("Power", showScreen, SCREEN_POWER);

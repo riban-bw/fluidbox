@@ -828,6 +828,7 @@ void deleteFile()
 void alert(string sMessage, string sTitle = "    ALERT", function<void(void)> pFunction = NULL, unsigned int nTimeout = 0)
 {
     g_mapScreens[SCREEN_ALERT]->SetTitle(sTitle);
+    g_mapScreens[SCREEN_ALERT]->SetParent(g_nCurrentScreen);
     showScreen(SCREEN_ALERT);
     uint32_t nColour = ribanfblib::GetColour32(200, 150, 50);
     g_pScreen->DrawRect(0,16,159,127, nColour, 0, nColour);
@@ -877,7 +878,7 @@ void onSelectSoundfont(int nAction)
         string sDst = "sf2/";
         sDst += sFilename;
         copyFile(sSrc, sDst);
-        showScreen(g_mapScreens[SCREEN_SOUNDFONT_LIST]->GetPreviousScreen());
+        showScreen(g_mapScreens[SCREEN_SOUNDFONT_LIST]->GetParent());
         break;
     }
     case SF_ACTION_DELETE:
@@ -906,15 +907,18 @@ void populateSoundfontList()
     case SF_ACTION_COPY:
         vPaths.push_back("/media/usb");
         pScreen->SetTitle("Copy soundfont");
+        pScreen->SetParent(SCREEN_SOUNDFONT);
         break;
     case SF_ACTION_DELETE:
         vPaths.push_back("sf2");
         pScreen->SetTitle("Delete soundfont");
+        pScreen->SetParent(SCREEN_SOUNDFONT);
         break;
     case SF_ACTION_SELECT:
         vPaths.push_back("sf2");
         vPaths.push_back("sf2/default");
         pScreen->SetTitle("Select soundfont");
+        pScreen->SetParent(SCREEN_EDIT_PRESET);
         break;
     }
     for(auto it = vPaths.begin(); it != vPaths.end(); ++it)
@@ -969,8 +973,6 @@ void showScreen(int nScreen)
         populateSoundfontList();
     }
     pScreen->Draw();
-    if(g_nCurrentScreen != nScreen)
-        pScreen->SetPreviousScreen(g_nCurrentScreen);
     g_nCurrentScreen = nScreen;
 
     // Action after showing ListScreen
@@ -1274,12 +1276,12 @@ void onButton(unsigned int nButton)
         break;
     case SCREEN_ALERT:
         if(nButton == BUTTON_LEFT)
-            showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
+            showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
         else if(nButton == BUTTON_RIGHT && g_pAlertCallback)
         {
             g_pAlertCallback();
             g_pAlertCallback = NULL;
-            showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
+            showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
         }
         break;
     case SCREEN_MIXER:
@@ -1289,7 +1291,7 @@ void onButton(unsigned int nButton)
             if(g_nCurrentChannel)
                 drawMixerChannel(--g_nCurrentChannel);
             else
-                showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
+                showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
             break;
         case BUTTON_RIGHT:
             if(g_nCurrentChannel < 15)
@@ -1355,7 +1357,7 @@ void onButton(unsigned int nButton)
         case BUTTON_LEFT:
             if(g_nCurrentChar == 0)
             {
-                showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
+                showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
                 return;
             }
             --g_nCurrentChar;
@@ -1373,7 +1375,7 @@ void onButton(unsigned int nButton)
             break;
         case BUTTON_LEFT:
         case BUTTON_RIGHT:
-            showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
+            showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
             break;
         }
         break;
@@ -1390,15 +1392,7 @@ void onButton(unsigned int nButton)
             g_mapScreens[g_nCurrentScreen]->Select();
             break;
         case BUTTON_LEFT:
-            switch(g_nCurrentScreen)
-            {
-                case SCREEN_POWER:
-                case SCREEN_SOUNDFONT_LIST:
-                    showScreen(g_mapScreens[g_nCurrentScreen]->GetPreviousScreen());
-                    break;
-            default:
-                showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
-            }
+            showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
             break;
         }
     }
@@ -1445,7 +1439,7 @@ void onSignal(int nSignal)
         else if(g_nCurrentScreen == SCREEN_ALERT)
         {
             g_pAlertCallback = NULL;
-            showScreen(g_mapScreens[SCREEN_ALERT]->GetPreviousScreen());
+            showScreen(g_mapScreens[SCREEN_ALERT]->GetParent());
         }
         break;
     case SIGINT:

@@ -44,26 +44,33 @@ public:
             delete *it;
     }
 
-    void SetPreviousScreen(unsigned int nScreen)
+    /** Set id of the parent screen
+    *   @param nScreen ID of parent screen
+    */
+    void SetParent(unsigned int nScreen)
     {
-        m_nPreviousScreen = nScreen;
+        m_nParent = nScreen;
     }
 
-    unsigned int GetPreviousScreen()
-    {
-        return m_nPreviousScreen;
-    }
-
+    /** Get id of parent screen
+    *   @retval unsigned int ID of parent screen
+    */
     unsigned int GetParent()
     {
         return m_nParent;
     }
 
+    /** Get id of the currently selected list entry
+    *   @retval int ID of currently selected entry (-1 for none)
+    */
     int GetSelection()
     {
         return m_nSelection;
     }
 
+    /** Set id of currently selected list entry
+    *   @param nSelection ID of entry to select
+    */
     void SetSelection(int nSelection)
     {
         if(nSelection < m_vEntries.size())
@@ -72,6 +79,9 @@ public:
             m_nSelection = m_vEntries.size() - 1;
     }
 
+    /** Get id of the list entry shown at top of screen (first displayed entry of possibly scrolled list)
+    *   @retval int ID of first displayed item (-1 if none displayed)
+    */
     int GetFirstShown()
     {
         return m_nFirstEntry;

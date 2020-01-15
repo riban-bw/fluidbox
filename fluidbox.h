@@ -44,6 +44,7 @@ enum SCREEN_ID
     SCREEN_PRESET_NAME,
     SCREEN_PRESET_SF,
     SCREEN_PRESET_PROGRAM,
+    SCREEN_PROGRAM,
     SCREEN_EFFECTS,
     SCREEN_EDIT_VALUE,
     SCREEN_MIXER,
@@ -363,4 +364,14 @@ void onRightHold(unsigned int nGpio);
 *   @param nSignal Signal number
 */
 void onSignal(int nSignal);
+
+/** Set the bank and program for the currently selected channel and preset
+*   @param nBankProgram Bank (most significant 8 bits) and program (least significant 8 bits)
+*/
+void setPresetProgram(int nBankProgram);
+
+/** Handle select program event
+*   @param nChannel Channel to edit
+*/
+void selectProgram(int nChannel);
 

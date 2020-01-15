@@ -523,6 +523,36 @@ void editEffect(unsigned int nParam)
     }
 }
 
+void setPresetProgram(int nBankProgram)
+{
+    int nBank = nBankProgram >> 8;
+    int nProgram = nBankProgram & 0xFF;
+    g_pCurrentPreset->program->bank = nBank;
+    g_pCurrentPreset->program->program = nProgram;
+    fluid_synth_program_change(g_pSynth, g_nCurrentChannel, nProgram);
+    fluid_synth_bank_select(g_pSynth, g_nCurrentChannel, nBank);
+    showScreen(SCREEN_PRESET_PROGRAM);
+}
+
+void selectProgram(int nChannel)
+{
+    g_mapScreens[SCREEN_PROGRAM]->ClearList();
+    fluid_sfont_t* pFont = fluid_synth_get_sfont_by_id(g_pSynth, g_nCurrentSoundfont);
+    char sPrefix[128];
+
+    fluid_preset_t* pProgram;
+    fluid_sfont_iteration_start(pFont);
+    while((pProgram = fluid_sfont_iteration_next(pFont)))
+    {
+        sprintf(sPrefix, "%02d:%02d %s", fluid_preset_get_banknum(pProgram), fluid_preset_get_num(pProgram), fluid_preset_get_name(pProgram));
+        cout << sPrefix << " " <<  (fluid_preset_get_banknum(pProgram) << 8) + (fluid_preset_get_num(pProgram)) << endl;
+        g_mapScreens[SCREEN_PROGRAM]->Add(fluid_preset_get_name(pProgram), setPresetProgram, (fluid_preset_get_banknum(pProgram) << 8) + (fluid_preset_get_num(pProgram)));
+        
+    }
+    showScreen(SCREEN_PROGRAM);
+    //!@todo Select program
+}
+
 void showEditProgram(unsigned int)
 {
     g_mapScreens[SCREEN_PRESET_PROGRAM]->ClearList();
@@ -540,7 +570,7 @@ void showEditProgram(unsigned int)
             if(pPreset)
                 sName += fluid_preset_get_name(pPreset);
         }
-        g_mapScreens[SCREEN_PRESET_PROGRAM]->Add(sName);
+        g_mapScreens[SCREEN_PRESET_PROGRAM]->Add(sName, selectProgram, nChannel);
     }
     showScreen(SCREEN_PRESET_PROGRAM);
 }
@@ -1274,6 +1304,7 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_PRESET_NAME] = new ListScreen(g_pScreen, "Preset Name", SCREEN_EDIT_PRESET);
     g_mapScreens[SCREEN_PRESET_SF] = new ListScreen(g_pScreen, "Preset Soundfont", SCREEN_EDIT_PRESET);
     g_mapScreens[SCREEN_PRESET_PROGRAM] = new ListScreen(g_pScreen,  "Preset Program", SCREEN_EDIT_PRESET);
+    g_mapScreens[SCREEN_PROGRAM] = new ListScreen(g_pScreen,  "Program", SCREEN_PRESET_PROGRAM);
     g_mapScreens[SCREEN_EFFECTS] = new ListScreen(g_pScreen, "Effects", SCREEN_EDIT);
     g_mapScreens[SCREEN_MIXER] = new ListScreen(g_pScreen,  "Mixer", SCREEN_EDIT);
     g_mapScreens[SCREEN_SOUNDFONT] = new ListScreen(g_pScreen, "Manage soundfonts", SCREEN_EDIT);

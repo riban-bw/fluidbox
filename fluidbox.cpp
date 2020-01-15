@@ -10,6 +10,62 @@
 #include <unistd.h> //provides pause, alarm
 #include <signal.h> //provides signal handling
 
+void showScreen(int nScreen)
+{
+    // Handle non-ListScreen screens
+    if(nScreen == SCREEN_LOGO)
+    {
+        g_pScreen->DrawBitmap("logo", 0, 0);
+        g_nCurrentScreen = SCREEN_LOGO;
+        return;
+    }
+
+    // Check the ListScreen exists
+    auto it = g_mapScreens.find(nScreen);
+    if(it == g_mapScreens.end())
+        return;
+    ListScreen* pScreen = it->second;
+
+    // Action before showing ListScreen
+    switch(nScreen)
+    {
+    case SCREEN_PERFORMANCE:
+        pScreen->SetSelection(getPresetIndex(g_pCurrentPreset));
+        if(g_bDirty)
+            g_mapScreens[SCREEN_PERFORMANCE]->SetTitle("  *riban Fluidbox");
+        else
+            g_mapScreens[SCREEN_PERFORMANCE]->SetTitle("   riban Fluidbox");
+        break;
+    case SCREEN_EDIT_VALUE:
+        g_mapScreens[SCREEN_EDIT_VALUE]->SetTitle(g_mapEffectParams[g_nCurrentEffect].name);
+        break;
+    case SCREEN_SOUNDFONT:
+        g_nSoundfontAction = SF_ACTION_NONE;
+        break;
+    case SCREEN_SOUNDFONT_LIST:
+        populateSoundfontList();
+    }
+    pScreen->Draw();
+    g_nCurrentScreen = nScreen;
+
+    // Action after showing ListScreen
+    switch(nScreen)
+    {
+    case SCREEN_MIXER:
+        g_nCurrentChannel = 0;
+        for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
+            drawMixerChannel(nChannel);
+        break;
+    case SCREEN_PRESET_NAME:
+        g_nCurrentChar = 0;
+        drawPresetName();
+        break;
+    case SCREEN_EDIT_VALUE:
+        drawEffectValue(g_nCurrentEffect, adjustEffect(g_nCurrentEffect, 0));
+        break;
+    }
+}
+
 void configParams()
 {
     g_mapEffectParams[REVERB_ENABLE].name = "Reverb enable";
@@ -696,61 +752,6 @@ void populateSoundfontList()
     }
 }
 
-void showScreen(int nScreen)
-{
-    // Handle non-ListScreen screens
-    if(nScreen == SCREEN_LOGO)
-    {
-        g_pScreen->DrawBitmap("logo", 0, 0);
-        g_nCurrentScreen = SCREEN_LOGO;
-        return;
-    }
-
-    // Check the ListScreen exists
-    auto it = g_mapScreens.find(nScreen);
-    if(it == g_mapScreens.end())
-        return;
-    ListScreen* pScreen = it->second;
-
-    // Action before showing ListScreen
-    switch(nScreen)
-    {
-    case SCREEN_PERFORMANCE:
-        pScreen->SetSelection(getPresetIndex(g_pCurrentPreset));
-        if(g_bDirty)
-            g_mapScreens[SCREEN_PERFORMANCE]->SetTitle("  *riban Fluidbox");
-        else
-            g_mapScreens[SCREEN_PERFORMANCE]->SetTitle("   riban Fluidbox");
-        break;
-    case SCREEN_EDIT_VALUE:
-        g_mapScreens[SCREEN_EDIT_VALUE]->SetTitle(g_mapEffectParams[g_nCurrentEffect].name);
-        break;
-    case SCREEN_SOUNDFONT:
-        g_nSoundfontAction = SF_ACTION_NONE;
-        break;
-    case SCREEN_SOUNDFONT_LIST:
-        populateSoundfontList();
-    }
-    pScreen->Draw();
-    g_nCurrentScreen = nScreen;
-
-    // Action after showing ListScreen
-    switch(nScreen)
-    {
-    case SCREEN_MIXER:
-        g_nCurrentChannel = 0;
-        for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
-            drawMixerChannel(nChannel);
-        break;
-    case SCREEN_PRESET_NAME:
-        g_nCurrentChar = 0;
-        drawPresetName();
-        break;
-    case SCREEN_EDIT_VALUE:
-        drawEffectValue(g_nCurrentEffect, adjustEffect(g_nCurrentEffect, 0));
-        break;
-    }
-}
 
 void save(int)
 {

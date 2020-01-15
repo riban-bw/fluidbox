@@ -281,9 +281,15 @@ void deleteFile();
 */
 void alert(string sMessage, string sTitle = "    ALERT", function<void(void)> pFunction = NULL, unsigned int nTimeout = 0);
 
-/** Loads a soundfont from file, unloading previously loaded soundfont */
+/** Loads a soundfont from file, unloading previously loaded soundfont
+*   @param sFilename Full path and filename of soundfont to load
+*   @retval bool True on succes
+*/
 bool loadSoundfont(string sFilename);
 
+/**  Handle select soundfont action
+*    @param nAction Action to perform on currently selected soundfont
+*/
 void onSelectSoundfont(int nAction);
 
 void populateSoundfontList();
@@ -293,11 +299,18 @@ void populateSoundfontList();
 */
 void showScreen(int nScreen);
 
+/** Handle save callback
+*   @param int Not used
+*/
 void save(int);
 
-/** Handle MIDI events */
+/** Handle MIDI events
+*   @param pData Pointer to fluidsynth instance
+*   @param pEvent Pointer to MIDI event
+*   @retval int 0 on success
+*   @note Called by fluidsynth MIDI router
+*/
 int onMidiEvent(void* pData, fluid_midi_event_t* pEvent);
-
 
 /** Load configuration from file
 *   @param  sFilename Full path and filename of configuration file
@@ -336,10 +349,18 @@ void requestDeletePreset(unsigned int);
 */
 void onButton(unsigned int nButton);
 
+/** Handle hold left button
+*   @param nGpio Index of GPIO being held
+*/
 void onLeftHold(unsigned int nGpio);
 
+/** Handle hold right button
+*   @param nGpio Index of GPIO being held
+*/
 void onRightHold(unsigned int nGpio);
 
-/**  Handles signal */
+/** Handles signal
+*   @param nSignal Signal number
+*/
 void onSignal(int nSignal);
 

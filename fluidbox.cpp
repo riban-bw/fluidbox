@@ -21,6 +21,7 @@
 #define CHANNELS_IN_PROG_SCREEN 6
 #define PI 3.14159265359
 #define MAX_NAME_LEN 20
+#define DEFAULT_FONT_SIZE 16, 12
 
 // Define GPIO pin usage (note some are not used by code but useful for planning
 #define BUTTON_UP      4
@@ -425,27 +426,29 @@ void power(unsigned int nAction)
     {
     case POWER_OFF:
         sCommand = "sudo poweroff";
-        sMessage = " POWERING DOWN";
+        sMessage = "POWERING DOWN";
         break;
     case POWER_OFF_SAVE:
         saveConfig();
         sCommand = "sudo poweroff";
-        sMessage = " POWERING DOWN";
+        sMessage = "POWERING DOWN";
         break;
     case POWER_REBOOT:
         sCommand = "sudo reboot";
-        sMessage = "      REBOOTING";
+        sMessage = "  REBOOTING";
         break;
     case POWER_REBOOT_SAVE:
         saveConfig();
         sCommand = "sudo reboot";
-        sMessage = "      REBOOTING";
+        sMessage = "  REBOOTING";
         break;
     default:
         return;
     }
     g_pScreen->Clear(DARK_RED);
-    g_pScreen->DrawText(sMessage, 0, 60);
+    g_pScreen->SetFont(20);
+    g_pScreen->DrawText(sMessage, 0, 70);
+    g_pScreen->SetFont(DEFAULT_FONT_SIZE);
     system(sCommand.c_str());
 }
 
@@ -736,7 +739,7 @@ void drawMixerChannel(unsigned int nChannel, int nLevel = -1)
     g_pScreen->DrawRect(g_nCurrentChannel * 10, 124, g_nCurrentChannel * 10 + 10,122, BLUE, 0, BLUE); // Selection highlight
     g_pScreen->SetFont(10);
     g_pScreen->DrawText(to_string(nChannel + 1), nChannel * 10 + 9, 121, GREY, 90);
-    g_pScreen->SetFont(16, 12);
+    g_pScreen->SetFont(DEFAULT_FONT_SIZE);
 }
 
 /** Draw preset name screen
@@ -834,7 +837,7 @@ void alert(string sMessage, string sTitle = "    ALERT", function<void(void)> pF
     g_pScreen->SetFont(16);
     g_pScreen->DrawText("NO", 16, 107, WHITE);
     g_pScreen->DrawText("YES", 119, 107,  WHITE);
-    g_pScreen->SetFont(16, 12);
+    g_pScreen->SetFont(DEFAULT_FONT_SIZE);
     g_pAlertCallback = pFunction;
     if(nTimeout)
         alarm(nTimeout);
@@ -974,10 +977,12 @@ void showScreen(int nScreen)
     switch(nScreen)
     {
     case SCREEN_MIXER:
+        g_nCurrentChannel = 0;
         for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
             drawMixerChannel(nChannel);
         break;
     case SCREEN_PRESET_NAME:
+        g_nCurrentChar = 0;
         drawPresetName();
         break;
     case SCREEN_EDIT_VALUE:
@@ -1459,7 +1464,7 @@ int main(int argc, char** argv)
     g_pScreen = new ribanfblib("/dev/fb1");
     g_pScreen->LoadBitmap("logo.bmp", "logo");
     showScreen(SCREEN_LOGO);
-    g_pScreen->SetFont(16, 12, "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf");
+    g_pScreen->SetFont(DEFAULT_FONT_SIZE, "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf");
     configParams();
 
     system("gpio mode 26 pwm");

@@ -146,7 +146,6 @@ void panic(int nMode, int nChannel)
     }
 }
 
-/*   Refresh the content of the presets list in the performance screen */
 void refreshPresetList()
 {
     g_mapScreens[SCREEN_PERFORMANCE]->ClearList();
@@ -162,10 +161,6 @@ void refreshPresetList()
     g_mapScreens[SCREEN_PERFORMANCE]->SetSelection(g_mapScreens[SCREEN_PERFORMANCE]->GetSelection()); // Sets to end if overrun
 }
 
-/*   Set the dirty flag of a preset
-*    @param pPreset Pointer to the preset - Default: current preset
-*    @param bDirty True to flag as dirty - Default: true
-*/
 void setDirty(Preset* pPreset, bool bDirty)
 {
     if(!pPreset)
@@ -653,6 +648,8 @@ void onSelectSoundfont(int nAction)
         if(sFilename[0] == '~')
             sFilename = "default/" + sFilename.substr(1);
         loadSoundfont(sFilename);
+        g_pCurrentPreset->soundfont=sFilename;
+        setDirty(g_pCurrentPreset);
         break;
     }
 }
@@ -723,6 +720,10 @@ void showScreen(int nScreen)
     {
     case SCREEN_PERFORMANCE:
         pScreen->SetSelection(getPresetIndex(g_pCurrentPreset));
+        if(g_bDirty)
+            g_mapScreens[SCREEN_PERFORMANCE]->SetTitle("  *riban Fluidbox");
+        else
+            g_mapScreens[SCREEN_PERFORMANCE]->SetTitle("   riban Fluidbox");
         break;
     case SCREEN_EDIT_VALUE:
         g_mapScreens[SCREEN_EDIT_VALUE]->SetTitle(g_mapEffectParams[g_nCurrentEffect].name);
@@ -797,7 +798,6 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
     }
     return 0;
 }
-
 
 bool loadConfig(string sFilename)
 {
@@ -942,6 +942,7 @@ Preset* createPreset()
     //!@todo Insert new preset at current position
     Preset* pPreset = new Preset;
     g_vPresets.push_back(pPreset);
+    setDirty(pPreset);
     refreshPresetList();
     return pPreset;
 }
@@ -996,8 +997,8 @@ void deletePreset()
         g_pCurrentPreset = *it;
     refreshPresetList();
     selectPreset(g_pCurrentPreset);
+    g_bDirty = true;
     showScreen(SCREEN_PERFORMANCE);
-    g_bDirty = true; //!@ Need method to indicate dirty state
 }
 
 void requestDeletePreset(unsigned int)

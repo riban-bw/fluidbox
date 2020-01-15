@@ -1,7 +1,4 @@
-#include "fluidsynth.h"
-#include "buttonhandler.hpp"
-#include "ribanfblib/ribanfblib.h"
-#include "screen.hpp"
+#include "fluidbox.h"
 #include <wiringPi.h>
 #include <cstdio> //provides printf
 #include <iostream> //provides streams
@@ -12,175 +9,7 @@
 #include <dirent.h> //provides directory management
 #include <unistd.h> //provides pause, alarm
 #include <signal.h> //provides signal handling
-#include <vector>
-#include <map>
 
-#define DEFAULT_SOUNDFONT "default/TimGM6mb.sf2"
-#define SF_ROOT "sf2/"
-#define MAX_PRESETS 127
-#define CHANNELS_IN_PROG_SCREEN 6
-#define PI 3.14159265359
-#define MAX_NAME_LEN 20
-#define DEFAULT_FONT_SIZE 16, 12
-
-// Define GPIO pin usage (note some are not used by code but useful for planning
-#define BUTTON_UP      4
-#define BUTTON_DOWN   17
-#define BUTTON_LEFT   27
-#define BUTTON_RIGHT   3
-#define BUTTON_PANIC  23
-#define SPI_CE1        7
-#define DISPLAY_CS     8
-#define SPI_CE0        8
-#define SPI_MISO       9
-#define SPI_MOSI      10
-#define SPI_SCLK      11
-#define DISPLAY_DC    24
-#define DISPLAY_RESET 25
-#define DISPLAY_LED   12
-
-using namespace std;
-
-enum SCREEN_ID
-{
-    SCREEN_NONE,
-    SCREEN_PERFORMANCE,
-    SCREEN_BLANK,
-    SCREEN_LOGO,
-    SCREEN_EDIT,
-    SCREEN_POWER,
-    SCREEN_EDIT_PRESET,
-    SCREEN_PRESET_NAME,
-    SCREEN_PRESET_SF,
-    SCREEN_PRESET_PROGRAM,
-    SCREEN_EFFECTS,
-    SCREEN_EDIT_VALUE,
-    SCREEN_MIXER,
-    SCREEN_SOUNDFONT,
-    SCREEN_SOUNDFONT_LIST,
-    SCREEN_REBOOT,
-    SCREEN_ALERT,
-    SCREEN_EOL
-};
-
-enum PANIC_MODE
-{
-    PANIC_NOTES,
-    PANIC_SOUNDS,
-    PANIC_RESET
-};
-
-enum POWER_MODE
-{
-    POWER_OFF,
-    POWER_OFF_SAVE,
-    POWER_REBOOT,
-    POWER_REBOOT_SAVE
-};
-
-enum EFFECT_PARAM
-{
-    REVERB_ENABLE,
-    REVERB_ROOMSIZE,
-    REVERB_DAMPING,
-    REVERB_WIDTH,
-    REVERB_LEVEL,
-    CHORUS_ENABLE,
-    CHORUS_VOICES,
-    CHORUS_LEVEL,
-    CHORUS_SPEED,
-    CHORUS_DEPTH,
-    CHORUS_TYPE
-};
-
-enum SOUNDFONT_ACTION
-{
-    SF_ACTION_NONE,
-    SF_ACTION_COPY,
-    SF_ACTION_DELETE,
-    SF_ACTION_SELECT
-};
-
-/** MIDI program parameters */
-struct Program
-{
-    string name = "New program";
-    unsigned int bank = 0;
-    unsigned int program = 0;
-    unsigned int level = 100;
-    unsigned int balance = 63;
-};
-
-/** Reverb parameters */
-struct Reverb
-{
-    bool enable = false;
-    double roomsize = 0;
-    double damping = 0;
-    double width = 0;
-    double level = 0;
-};
-
-/** Chorus parameters */
-struct Chorus
-{
-    bool enable = false;
-    int voicecount = 0;
-    double level = 0;
-    double speed = 0.1;
-    double depth = 0;
-    int type = FLUID_CHORUS_MOD_SINE;
-};
-
-/** Parameters used by presets */
-struct Preset
-{
-    string name = "New preset          ";
-    string soundfont = DEFAULT_SOUNDFONT;
-    Program program[16];
-    Reverb reverb;
-    Chorus chorus;
-    bool dirty = false;
-};
-
-/** Limits of each effect parameter */
-struct EffectParams
-{
-    double min;
-    double max;
-    double delta;
-    string name;
-};
-
-
-map <unsigned int,EffectParams> g_mapEffectParams;
-
-
-void showScreen(int nScreen);
-
-fluid_synth_t* g_pSynth; // Pointer to the synth object
-ribanfblib* g_pScreen; // Pointer to the screen object
-int g_nCurrentSoundfont = FLUID_FAILED; // ID of currently loaded soundfont
-int g_nRunState = 1; // Current run state [1=running, 0=closing]
-unsigned int g_nNoteCount[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // Quantity of notes playing on each MIDI channel
-vector<Preset*> g_vPresets; // Map of presets indexed by id
-//Preset g_presets[MAX_PRESETS]; // Preset configurations
-Preset* g_pCurrentPreset = NULL; // Pointer to the currently selected preset
-//!@todo Cannot handle zero presets!!!
-unsigned int g_nSelectedChannel = 0; // Index of the selected (highlighted) program
-unsigned int g_nListSelection = 0; // Currently highlighted entry in a list
-unsigned char debouncePin[32]; // Debounce streams for each GPIO pin
-
-map<unsigned int,ListScreen*> g_mapScreens; // Map of screens indexed by id
-unsigned int g_nCurrentScreen; // Id of currently displayed screen
-unsigned int g_nCurrentChannel = 0; // Selected channel, e.g. within mixer screen
-unsigned int g_nCurrentChar = 0; // Index of highlighted character in name edit
-unsigned int g_nCurrentEffect;
-bool g_bDirty = false;// True if configuration needs to be saved
-SOUNDFONT_ACTION g_nSoundfontAction = SF_ACTION_NONE;
-function<void(void)> g_pAlertCallback = NULL;
-
-/**   Populate effect parameter data */
 void configParams()
 {
     g_mapEffectParams[REVERB_ENABLE].name = "Reverb enable";
@@ -228,12 +57,7 @@ void configParams()
     g_mapEffectParams[CHORUS_TYPE].max = FLUID_CHORUS_MOD_TRIANGLE;
     g_mapEffectParams[CHORUS_TYPE].delta = 1.0;
 }
-/**     Return a converted and vaildated value
-*       @param sValue Value as a string
-*       @param min Minimum permitted value
-*       @param max Maximum permitted value
-*       @retval double Value converted to double limited to range min-max
-*/
+
 double validateDouble(string sValue, double min, double max)
 {
     double fValue = 0.0;
@@ -252,12 +76,6 @@ double validateDouble(string sValue, double min, double max)
     return fValue;
 }
 
-/**     Return a converted and vaildated value
-*       @param sValue Value as a string
-*       @param min Minimum permitted value
-*       @param max Maximum permitted value
-*       @retval int Value converted to int limited to range min-max
-*/
 int validateInt(string sValue, int min, int max)
 {
     int nValue = 0;
@@ -276,7 +94,6 @@ int validateInt(string sValue, int min, int max)
     return nValue;
 }
 
-/** Convert string to lowercase */
 string toLower(string sString)
 {
     string sReturn;
@@ -285,18 +102,11 @@ string toLower(string sString)
     return sReturn;
 }
 
-/** Check if USB storage is mounted
-*   retval bool True if mounted
-*/
 bool isUsbMounted()
 {
     return (system("mount | grep /media/usb > /dev/null") ==0);
 }
 
-/** Get the index of a preset
-*   @param  pPreset Pointer to a preset
-*   @retval int Index of preset or -1 if none found
-*/
 int getPresetIndex(Preset* pPreset)
 {
     int nIndex = 0;
@@ -308,11 +118,7 @@ int getPresetIndex(Preset* pPreset)
     return -1;
 }
 
-/** PANIC
-    param nMode Panic mode [PANIC_NOTES | PANIC_SOUNDS | PANIC_RESET]
-    param nChannel MIDI channel to reset [0-15, 16=ALL]
-**/
-void panic(int nMode=PANIC_NOTES, int nChannel=16)
+void panic(int nMode, int nChannel)
 {
     if(nMode == PANIC_RESET)
     {
@@ -360,7 +166,7 @@ void refreshPresetList()
 *    @param pPreset Pointer to the preset - Default: current preset
 *    @param bDirty True to flag as dirty - Default: true
 */
-void setDirty(Preset* pPreset = NULL, bool bDirty = true)
+void setDirty(Preset* pPreset, bool bDirty)
 {
     if(!pPreset)
         pPreset = g_pCurrentPreset;
@@ -374,8 +180,7 @@ void setDirty(Preset* pPreset = NULL, bool bDirty = true)
         showScreen(SCREEN_PERFORMANCE);
 }
 
-/** Save persistent data to configuration file */
-bool saveConfig(string sFilename = "./fb.config")
+bool saveConfig(string sFilename)
 {
     ofstream fileConfig;
     fileConfig.open(sFilename, ios::out);
@@ -452,10 +257,6 @@ void power(unsigned int nAction)
     system(sCommand.c_str());
 }
 
-/** Draws representation of current effect parameter value
-*   @param  nParam Index of the effect parameter
-*   @param  nValue Value of parameter, scaled to 0..70
-*/
 void drawEffectValue(unsigned int nParam, double dValue)
 {
     if(g_nCurrentScreen != SCREEN_EDIT_VALUE || nParam > 10)
@@ -491,13 +292,7 @@ void drawEffectValue(unsigned int nParam, double dValue)
     g_pScreen->DrawText(sValue, nX, nY + 20);
 }
 
-/** Alters the value of an effect parameter
-*   @param  nParam Index of the effect parameter to alter
-*   @param  nChange Amount to change value [-1, 0, +1]
-*   @retval double Value of the parameter after adjustment
-*   @note   If nChange is non-zero then screen is drawn with new value
-*/
-double adjustEffect(unsigned int nParam, int nChange = 0)
+double adjustEffect(unsigned int nParam, int nChange)
 {
     if(nParam > 10)
         return 0;
@@ -618,11 +413,7 @@ double adjustEffect(unsigned int nParam, int nChange = 0)
     return dValue;
 }
 
-/**  Set enable or disable an effect
-*    @param nEffect Index of the effect [REVERB_ENABLE | CHORUS_ENABLE]
-*    @param bEnable True to enable, false to disable - default true
-*/
-void enableEffect(unsigned int nEffect, bool bEnable = true)
+void enableEffect(unsigned int nEffect, bool bEnable)
 {
     string sText;
     bool bWasEnabled;
@@ -681,8 +472,7 @@ void editEffect(unsigned int nParam)
     }
 }
 
-/**  Shows the edit program screen */
-void showEditProgram(unsigned int=0)
+void showEditProgram(unsigned int)
 {
     g_mapScreens[SCREEN_PRESET_PROGRAM]->ClearList();
     int nSfId, nBank, nProgram;
@@ -704,9 +494,6 @@ void showEditProgram(unsigned int=0)
     showScreen(SCREEN_PRESET_PROGRAM);
 }
 
-/**     Update the MIDI note on indicator on the program screens showing quantity of on notes (max 15)
-*       @param nChannel MIDI channel to update
-*/
 void showMidiActivity(int nChannel)
 {
     if(g_nCurrentScreen != SCREEN_PRESET_PROGRAM || nChannel < g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown() || nChannel > g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown() + 6)
@@ -718,11 +505,7 @@ void showMidiActivity(int nChannel)
         g_pScreen->DrawRect(0,nY+15, 1,nY+15-nCount, RED, 0, RED); // Draw indicator
 }
 
-/** Draw a mixer channel
-*   @param  nChannel MIDI channel [0-15]
-*   @param  nValue MIDI CC7 value to display [0-127] Default: -1: Get value from synth
-*/
-void drawMixerChannel(unsigned int nChannel, int nLevel = -1)
+void drawMixerChannel(unsigned int nChannel, int nLevel)
 {
     if(g_nCurrentScreen != SCREEN_MIXER || nChannel > 15)
         return;
@@ -742,8 +525,6 @@ void drawMixerChannel(unsigned int nChannel, int nLevel = -1)
     g_pScreen->SetFont(DEFAULT_FONT_SIZE);
 }
 
-/** Draw preset name screen
-*/
 void drawPresetName()
 {
     g_pScreen->DrawRect(0, 16, 159, 127, BLACK, 0, BLACK);
@@ -751,19 +532,12 @@ void drawPresetName()
     g_pScreen->DrawRect(7 + g_nCurrentChar * 7, 71, 14 + g_nCurrentChar * 7, 72, BLACK, 0, BLUE);
 }
 
-/** Handle "manage soundfont" events
-*   @param nAction Action to take on selected soundfont
-*/
 void listSoundfont(int nAction)
 {
     g_nSoundfontAction = (SOUNDFONT_ACTION)nAction;
     showScreen(SCREEN_SOUNDFONT_LIST);
 }
 
-/** Copy a file
-*   sSource Full path and filename of file to copy
-*   sDest Full path and filename of new file
-*/
 void copyFile(string sSource, string sDest)
 {
     int nSrc = open(sSource.c_str(), O_RDONLY, 0);
@@ -807,7 +581,6 @@ void copyFile(string sSource, string sDest)
     free(pBuffer);
 }
 
-/** Delete file selected in soundfont file list */
 void deleteFile()
 {
     string sCommand = "sudo rm sf2/'";
@@ -817,15 +590,7 @@ void deleteFile()
     cout << sCommand << endl;
 }
 
-/** Show an alert
-*   @param sMessage Message to display (limit to single 20 char line)
-*   @param sTitle Title to display at top of alert
-*   @param pFunction Pointer to a function to call if RIGHT / SELECT / ENTER button pressed - Default: None
-*   @param nTimeout Period in seconds before alert clears - Default: 0, no timeout
-*   @note  Pressing LEFT / CANCEL button clears the alert
-*   @note  Callback must be in form: void function()
-*/
-void alert(string sMessage, string sTitle = "    ALERT", function<void(void)> pFunction = NULL, unsigned int nTimeout = 0)
+void alert(string sMessage, string sTitle, function<void(void)>  pFunction, unsigned int nTimeout)
 {
     g_mapScreens[SCREEN_ALERT]->SetTitle(sTitle);
     g_mapScreens[SCREEN_ALERT]->SetParent(g_nCurrentScreen);
@@ -844,7 +609,6 @@ void alert(string sMessage, string sTitle = "    ALERT", function<void(void)> pF
         alarm(nTimeout);
 }
 
-/** Loads a soundfont from file, unloading previously loaded soundfont */
 bool loadSoundfont(string sFilename)
 {
     if(g_nCurrentSoundfont >= 0)
@@ -938,9 +702,6 @@ void populateSoundfontList()
     }
 }
 
-/** Display the requested screen
-    @param pScreen Pointer to the screen to display
-*/
 void showScreen(int nScreen)
 {
     // Handle non-ListScreen screens
@@ -999,7 +760,6 @@ void save(int)
     showScreen(SCREEN_PERFORMANCE);
 }
 
-/** Handle MIDI events */
 int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
 {
     fluid_synth_handle_midi_event(pData, pEvent);
@@ -1039,10 +799,7 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
 }
 
 
-/** Load configuration from file
-*   @param  sFilename Full path and filename of configuration file
-*/
-bool loadConfig(string sFilename = "./fb.config")
+bool loadConfig(string sFilename)
 {
     ifstream fileConfig;
     fileConfig.open(sFilename, ios::in);
@@ -1153,10 +910,6 @@ bool loadConfig(string sFilename = "./fb.config")
     return true;
 }
 
-/** Select a preset
-*   @param pPreset Pointer to preset to load
-*   @retval bool True on success
-*/
 bool selectPreset(Preset* pPreset)
 {
     int nPreset = getPresetIndex(pPreset);
@@ -1184,9 +937,6 @@ bool selectPreset(Preset* pPreset)
     return true;
 }
 
-/** Create a new preset object
-*   @retval Preset* Pointer to the new preset object
-*/
 Preset* createPreset()
 {
     //!@todo Insert new preset at current position
@@ -1196,12 +946,7 @@ Preset* createPreset()
     return pPreset;
 }
 
-/**  Copy a preset
-*    @param pSrc Pointer to the source preset
-*    @param pDst Pointer to the destination preset (NULL to create new preset)
-*    @retval bool True on success
-*/
-bool copyPreset(Preset* pSrc, Preset* pDst = NULL)
+bool copyPreset(Preset* pSrc, Preset* pDst)
 {
     if(getPresetIndex(pSrc) < 0)
         return false;
@@ -1232,14 +977,12 @@ bool copyPreset(Preset* pSrc, Preset* pDst = NULL)
     return true;
 }
 
-/** Handle newPreset event */
 void newPreset(unsigned int)
 {
     selectPreset(createPreset());
     showScreen(SCREEN_PERFORMANCE);
 }
 
-/**  Delete the currently selected preset */
 void deletePreset()
 {
     auto it = find(g_vPresets.begin(), g_vPresets.end(), g_pCurrentPreset);
@@ -1257,7 +1000,6 @@ void deletePreset()
     g_bDirty = true; //!@ Need method to indicate dirty state
 }
 
-/**  Handle request to delete the currently selected preset */
 void requestDeletePreset(unsigned int)
 {
     if(g_vPresets.size() == 1)
@@ -1272,9 +1014,6 @@ void requestDeletePreset(unsigned int)
     alert((*it)->name, "  **DELETE PRESET**", deletePreset);
 }
 
-/** Handle navigation buttons
-    @param nButton Index of button pressed
-*/
 void onButton(unsigned int nButton)
 {
     switch(g_nCurrentScreen)
@@ -1436,7 +1175,6 @@ void onRightHold(unsigned int nGpio)
     }
 }
 
-/**  Handles signal */
 void onSignal(int nSignal)
 {
     switch(nSignal)

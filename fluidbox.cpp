@@ -299,12 +299,12 @@ void admin(unsigned int nAction)
         sMessage = "  REBOOTING";
         break;
      case SAVE_CONFIG:
-        saveConfig():
+        saveConfig();
         showScreen(SCREEN_PERFORMANCE);
         return;
     case SAVE_BACKUP:
         if(isUsbMounted())
-            saveBackup("/media/usb/fluidbox.config");
+            saveConfig("/media/usb/fluidbox.config");
         showScreen(SCREEN_PERFORMANCE);
         return;
     case LOAD_BACKUP:
@@ -312,8 +312,7 @@ void admin(unsigned int nAction)
             loadConfig("/media/usb/fluidbox.config");
         showScreen(SCREEN_PERFORMANCE);
         return;
-    }
-   default:
+    default:
         return;
     }
     g_pScreen->Clear(DARK_RED);
@@ -482,7 +481,6 @@ double adjustEffect(unsigned int nParam, int nChange)
 void enableEffect(unsigned int nEffect, bool bEnable)
 {
     string sText;
-    bool bWasEnabled;
     if(nEffect == REVERB_ENABLE)
     {
         fluid_synth_set_reverb_on(g_pSynth, bEnable);
@@ -544,8 +542,9 @@ void setPresetProgram(int nBankProgram)
     int nProgram = nBankProgram & 0xFF;
     g_pCurrentPreset->program->bank = nBank;
     g_pCurrentPreset->program->program = nProgram;
-    fluid_synth_program_change(g_pSynth, g_nCurrentChannel, nProgram);
     fluid_synth_bank_select(g_pSynth, g_nCurrentChannel, nBank);
+    fluid_synth_program_change(g_pSynth, g_nCurrentChannel, nProgram);
+    setDirty();
     showEditProgram(0);
 }
 

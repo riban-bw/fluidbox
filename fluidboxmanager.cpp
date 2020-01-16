@@ -151,7 +151,7 @@ int main(int argc, char** argv)
     struct stat fileStat;
     bool bFluidbox = (stat ("/media/usb0/fluidbox", &fileStat) == 0 && S_ISREG(fileStat.st_mode));
     bool bBackup = (stat ("/media/usb0/fluidbox.config", &fileStat) == 0 && S_ISREG(fileStat.st_mode));
-    if(bFluidbox || bSoundfont)
+    if(bFluidbox || bBackup)
     {
         ListScreen display(&screen, "Update available", 0);
         g_pDisplay = &display;

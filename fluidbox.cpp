@@ -160,7 +160,7 @@ string toLower(string sString)
 
 bool isUsbMounted()
 {
-    return (system("mount | grep /media/usb > /dev/null") ==0);
+    return (system("mount | grep /media/usb > /dev/null") == 0);
 }
 
 int getPresetIndex(Preset* pPreset)
@@ -275,7 +275,7 @@ bool saveConfig(string sFilename)
     return true;
 }
 
-void power(unsigned int nAction)
+void admin(unsigned int nAction)
 {
     string sCommand, sMessage;
     switch(nAction)
@@ -298,7 +298,22 @@ void power(unsigned int nAction)
         sCommand = "sudo reboot";
         sMessage = "  REBOOTING";
         break;
-    default:
+     case SAVE_CONFIG:
+        saveConfig():
+        showScreen(SCREEN_PERFORMANCE);
+        return;
+    case SAVE_BACKUP:
+        if(isUsbMounted())
+            saveBackup("/media/usb/fluidbox.config");
+        showScreen(SCREEN_PERFORMANCE);
+        return;
+    case LOAD_BACKUP:
+        if(isUsbMounted())
+            loadConfig("/media/usb/fluidbox.config");
+        showScreen(SCREEN_PERFORMANCE);
+        return;
+    }
+   default:
         return;
     }
     g_pScreen->Clear(DARK_RED);
@@ -531,26 +546,20 @@ void setPresetProgram(int nBankProgram)
     g_pCurrentPreset->program->program = nProgram;
     fluid_synth_program_change(g_pSynth, g_nCurrentChannel, nProgram);
     fluid_synth_bank_select(g_pSynth, g_nCurrentChannel, nBank);
-    showScreen(SCREEN_PRESET_PROGRAM);
+    showEditProgram(0);
 }
 
 void selectProgram(int nChannel)
 {
     g_mapScreens[SCREEN_PROGRAM]->ClearList();
+    g_nCurrentChannel = nChannel;
     fluid_sfont_t* pFont = fluid_synth_get_sfont_by_id(g_pSynth, g_nCurrentSoundfont);
-    char sPrefix[128];
 
     fluid_preset_t* pProgram;
     fluid_sfont_iteration_start(pFont);
     while((pProgram = fluid_sfont_iteration_next(pFont)))
-    {
-        sprintf(sPrefix, "%02d:%02d %s", fluid_preset_get_banknum(pProgram), fluid_preset_get_num(pProgram), fluid_preset_get_name(pProgram));
-        cout << sPrefix << " " <<  (fluid_preset_get_banknum(pProgram) << 8) + (fluid_preset_get_num(pProgram)) << endl;
         g_mapScreens[SCREEN_PROGRAM]->Add(fluid_preset_get_name(pProgram), setPresetProgram, (fluid_preset_get_banknum(pProgram) << 8) + (fluid_preset_get_num(pProgram)));
-        
-    }
     showScreen(SCREEN_PROGRAM);
-    //!@todo Select program
 }
 
 void showEditProgram(unsigned int)
@@ -778,13 +787,6 @@ void populateSoundfontList()
             }
         }
     }
-}
-
-
-void save(int)
-{
-    saveConfig();
-    showScreen(SCREEN_PERFORMANCE);
 }
 
 int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
@@ -1318,17 +1320,19 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_EDIT]->Add("New preset", newPreset);
     g_mapScreens[SCREEN_EDIT]->Add("Delete preset", requestDeletePreset);
     g_mapScreens[SCREEN_EDIT]->Add("Manage soundfonts", showScreen, SCREEN_SOUNDFONT);
-    g_mapScreens[SCREEN_EDIT]->Add("Save", save);
+    g_mapScreens[SCREEN_EDIT]->Add("Save", admin, SAVE_CONFIG);
+    g_mapScreens[SCREEN_EDIT]->Add("Backup", admin, SAVE_BACKUP);
+    g_mapScreens[SCREEN_EDIT]->Add("Restore", admin, LOAD_BACKUP);
     g_mapScreens[SCREEN_EDIT]->Add("Power", showScreen, SCREEN_POWER);
 
     g_mapScreens[SCREEN_EDIT_PRESET]->Add("Name", showScreen, SCREEN_PRESET_NAME);
     g_mapScreens[SCREEN_EDIT_PRESET]->Add("Soundfont", listSoundfont, SF_ACTION_SELECT);
     g_mapScreens[SCREEN_EDIT_PRESET]->Add("Program", showEditProgram);
 
-    g_mapScreens[SCREEN_POWER]->Add("Save and power off", power, POWER_OFF_SAVE);
-    g_mapScreens[SCREEN_POWER]->Add("Save and reboot", power, POWER_REBOOT_SAVE);
-    g_mapScreens[SCREEN_POWER]->Add("Power off", power, POWER_OFF);
-    g_mapScreens[SCREEN_POWER]->Add("Reboot",  power, POWER_REBOOT);
+    g_mapScreens[SCREEN_POWER]->Add("Save and power off", admin, POWER_OFF_SAVE);
+    g_mapScreens[SCREEN_POWER]->Add("Save and reboot", admin, POWER_REBOOT_SAVE);
+    g_mapScreens[SCREEN_POWER]->Add("Power off", admin, POWER_OFF);
+    g_mapScreens[SCREEN_POWER]->Add("Reboot",  admin, POWER_REBOOT);
 
     g_mapScreens[SCREEN_EFFECTS]->Add("Reverb enable", editEffect, REVERB_ENABLE);
     g_mapScreens[SCREEN_EFFECTS]->Add("Reverb room size", editEffect, REVERB_ROOMSIZE);

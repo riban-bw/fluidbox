@@ -62,12 +62,15 @@ enum PANIC_MODE
     PANIC_RESET
 };
 
-enum POWER_MODE
+enum ADMIN_MODE
 {
     POWER_OFF,
     POWER_OFF_SAVE,
     POWER_REBOOT,
     POWER_REBOOT_SAVE
+    SAVE_CONFIG,
+    SAVE_BACKUP,
+    LOAD_BACKUP
 };
 
 enum EFFECT_PARAM
@@ -217,7 +220,10 @@ void setDirty(Preset* pPreset = NULL, bool bDirty = true);
 /** Save persistent data to configuration file */
 bool saveConfig(string sFilename = "./fb.config");
 
-void power(unsigned int nAction);
+/** Handle admin events
+*   @param  nAction ID of event
+*/
+void admin(unsigned int nAction);
 
 /** Draws representation of current effect parameter value
 *   @param  nParam Index of the effect parameter
@@ -300,11 +306,6 @@ void populateSoundfontList();
 */
 void showScreen(int nScreen);
 
-/** Handle save callback
-*   @param int Not used
-*/
-void save(int);
-
 /** Handle MIDI events
 *   @param pData Pointer to fluidsynth instance
 *   @param pEvent Pointer to MIDI event
@@ -316,7 +317,7 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent);
 /** Load configuration from file
 *   @param  sFilename Full path and filename of configuration file
 */
-bool loadConfig(string sFilename = "./fb.config");
+bool loadConfig(string sFilename = "./fluidbox.config");
 
 /** Select a preset
 *   @param pPreset Pointer to preset to load

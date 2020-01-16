@@ -46,6 +46,7 @@
 		</Compiler>
 		<Unit filename="buttonhandler.hpp" />
 		<Unit filename="fluidbox.cpp" />
+		<Unit filename="fluidbox.h" />
 		<Unit filename="fluidboxmanager.cpp" />
 		<Unit filename="fluidsynth/build/CMakeFiles/3.14.5/CompilerIdC/CMakeCCompilerId.c">
 			<Option compilerVar="CC" />

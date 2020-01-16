@@ -20,7 +20,7 @@ using namespace std;
 enum UPDATE_TYPE
 {
     UPDATE_FLUIDBOX,
-    UPDATE_SOUNDFONT,
+    UPDATE_BACKUP,
     UPDATE_BOTH
 };
 
@@ -93,8 +93,8 @@ void update(int nMode)
     g_pScreen->DrawText("Do not turn off", 20, 85);
     if(nMode == UPDATE_FLUIDBOX || nMode == UPDATE_BOTH)
         copyFile("/media/usb/fluidbox", "./fluidbox");
-    if(nMode == UPDATE_SOUNDFONT  || nMode == UPDATE_BOTH)
-        copyFile("/media/usb/fluidbox.sf2", "./sf2/fluidbox.sf2");
+    if(nMode == UPDATE_BACKUP || nMode == UPDATE_BOTH)
+        copyFile("/media/usb/fluidbox.config", "./fluidbox.config");
     g_pScreen->Clear();
     g_pScreen->DrawText("Update complete", 10, 72);
     usleep(3000000);
@@ -150,7 +150,7 @@ int main(int argc, char** argv)
     // Look for update files
     struct stat fileStat;
     bool bFluidbox = (stat ("/media/usb0/fluidbox", &fileStat) == 0 && S_ISREG(fileStat.st_mode));
-    bool bSoundfont = (stat ("/media/usb0/fluidbox.sf2", &fileStat) == 0 && S_ISREG(fileStat.st_mode));
+    bool bBackup = (stat ("/media/usb0/fluidbox.config", &fileStat) == 0 && S_ISREG(fileStat.st_mode));
     if(bFluidbox || bSoundfont)
     {
         ListScreen display(&screen, "Update available", 0);
@@ -158,11 +158,11 @@ int main(int argc, char** argv)
         display.Add("Update fluidbox", update, UPDATE_FLUIDBOX);
         if(!bFluidbox)
             display.Enable(0, false);
-        display.Add("Update soundfont", update, UPDATE_SOUNDFONT);
-        if(!bSoundfont)
+        display.Add("Restore backup", update, UPDATE_BACKUP);
+        if(!bBackup)
             display.Enable(1, false);
         display.Add("Update both", update, UPDATE_BOTH);
-        if(!bFluidbox || !bSoundfont)
+        if(!bFluidbox || !bBackup)
             display.Enable(2, false);
         display.Draw();
 
@@ -196,7 +196,6 @@ int main(int argc, char** argv)
     else
         cout << "Fluidbox manager not found any updates on USB" << endl;
 
-    //!@todo Should we delete framebuffer before opening app?
     cout << "Launching fluidbox..." << endl;
     system("./fluidbox");
 

@@ -585,13 +585,22 @@ void showEditProgram(unsigned int)
 
 void showMidiActivity(int nChannel)
 {
-    if(g_nCurrentScreen != SCREEN_PRESET_PROGRAM || nChannel < g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown() || nChannel > g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown() + 6)
-        return;
-    int nY = 16 + (nChannel - g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown()) * 16; //Upper left corner of channel indicator
-    g_pScreen->DrawRect(0,nY, 1,nY+15, BLACK, 0, BLACK); // Clear the indicator
-    int nCount = (g_nNoteCount[nChannel] < 16)?g_nNoteCount[nChannel]:15; // Limit max note indication to 15
-    if(nCount)
-        g_pScreen->DrawRect(0,nY+15, 1,nY+15-nCount, RED, 0, RED); // Draw indicator
+    if(g_nCurrentScreen == SCREEN_PRESET_PROGRAM && nChannel >= g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown() && nChannel <= g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown() + 6)
+    {
+        int nY = 16 + (nChannel - g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown()) * 16; //Upper left corner of channel indicator
+        g_pScreen->DrawRect(0,nY, 1,nY+15, BLACK, 0, BLACK); // Clear the indicator
+        int nCount = (g_nNoteCount[nChannel] < 16)?g_nNoteCount[nChannel]:15; // Limit max note indication to 15
+        if(nCount)
+            g_pScreen->DrawRect(0,nY+15, 1,nY+15-nCount, RED, 0, RED); // Draw indicator
+    }
+    else if(g_nCurrentScreen == SCREEN_MIXER)
+    {
+        int nX = nChannel * 10; //Upper left corner of channel indicator
+        g_pScreen->DrawRect(nX, 126,nX+9, 127, BLACK, 0, BLACK); // Clear the indicator
+        int nCount = (g_nNoteCount[nChannel] < 10)?g_nNoteCount[nChannel]:9; // Limit max note indication to 9
+        if(nCount)
+            g_pScreen->DrawRect(nX, 126, nX+nCount, 127, RED, 0, RED); // Draw indicator
+    }
 }
 
 void drawMixerChannel(unsigned int nChannel)

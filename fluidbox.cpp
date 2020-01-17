@@ -200,6 +200,7 @@ void panic(int nMode, int nChannel)
             fluid_synth_all_sounds_off(g_pSynth, i);
             break;
         }
+        drawMixerChannel(i);
     }
 }
 
@@ -240,6 +241,10 @@ bool saveConfig(string sFilename)
         printf("Error: Failed to open configuration: %s\n", sFilename.c_str());
         return false;
     }
+
+    // Save global configurations
+    fileConfig << "[global]" << endl;
+    fileConfig << "gain=" << fluid_synth_get_gain(g_pSynth) << endl;
 
     // Save presets
     for(auto it = g_vPresets.begin(); it != g_vPresets.end(); ++it)
@@ -866,19 +871,27 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
         showMidiActivity(nChannel);
         break;
     case 0x90: //NOTE_ON
-        g_nNoteCount[nChannel]++;
+        if(fluid_midi_event_get_value(pEvent))
+            g_nNoteCount[nChannel]++;
+        else if(g_nNoteCount[nChannel] > 0)
+            g_nNoteCount[nChannel]--;
         showMidiActivity(nChannel);
         break;
     case 0xB0: //CONTROL_CHANGE
-        if(fluid_midi_event_get_control(pEvent) == 7)
+        switch(fluid_midi_event_get_control(pEvent))
         {
+        case 7:
             g_pCurrentPreset->program[nChannel].level = fluid_midi_event_get_value(pEvent);
             drawMixerChannel(nChannel);
             setDirty();
+            break;
+        case 120: // All sound off
+        case 123: // All notes off
+            g_nNoteCount[nChannel] = 0;
+            showMidiActivity(nChannel);
+            break;
         }
         break;
-    default:
-        printf("Unhandled MIDI event type: 0x%02x\n", nType);
     }
     return 0;
 }
@@ -928,7 +941,12 @@ bool loadConfig(string sFilename)
         string sParam = sLine.substr(0, nDelim);
         string sValue = sLine.substr(nDelim + 1);
 
-        if(sGroup.substr(0,6) == "preset" && pPreset)
+        if(sGroup == "global")
+        {
+            if(sParam == "gain")
+                fluid_synth_set_gain(g_pSynth, stof(sValue));
+        }
+        else if(sGroup == "preset" && pPreset)
         {
             if(sParam == "selected" && sValue != "0")
                 g_pCurrentPreset = pPreset;
@@ -1145,6 +1163,7 @@ void onButton(unsigned int nButton)
                 {
                     float fGain = fluid_synth_get_gain(g_pSynth);
                     fluid_synth_set_gain(g_pSynth, fGain + ((fGain > 0.1)?0.01:0.001));
+                    g_bDirty = true;
                 }
                 else
                 {
@@ -1166,6 +1185,7 @@ void onButton(unsigned int nButton)
                 {
                     float fGain = fluid_synth_get_gain(g_pSynth);
                     fluid_synth_set_gain(g_pSynth, fGain - ((fGain > 0.1)?0.01:0.001));
+                    g_bDirty = true;
                 }
                 else
                 {
@@ -1324,8 +1344,6 @@ int main(int argc, char** argv)
     system("gpio mode 26 pwm");
     system("gpio pwm 26 900");
 
-    loadConfig();
-
     // Create and populate fluidsynth settings
     fluid_settings_t* pSettings = new_fluid_settings();
     fluid_settings_setint(pSettings, "midi.autoconnect", 1);
@@ -1362,6 +1380,8 @@ int main(int argc, char** argv)
         cout << "Created audio driver" << endl;
     else
         cerr << "Failed to create audio driver" << endl;
+
+    loadConfig();
 
     // Configure buttons
     wiringPiSetupGpio();

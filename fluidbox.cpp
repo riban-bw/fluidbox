@@ -549,8 +549,8 @@ void setPresetProgram(int nBankProgram)
 {
     int nBank = nBankProgram >> 8;
     int nProgram = nBankProgram & 0xFF;
-    g_pCurrentPreset->program->bank = nBank;
-    g_pCurrentPreset->program->program = nProgram;
+    g_pCurrentPreset->program[g_nCurrentChannel].bank = nBank;
+    g_pCurrentPreset->program[g_nCurrentChannel].program = nProgram;
     fluid_synth_bank_select(g_pSynth, g_nCurrentChannel, nBank);
     fluid_synth_program_change(g_pSynth, g_nCurrentChannel, nProgram);
     setDirty();
@@ -565,8 +565,15 @@ void selectProgram(int nChannel)
 
     fluid_preset_t* pProgram;
     fluid_sfont_iteration_start(pFont);
+    int nBank, nProgram;
     while((pProgram = fluid_sfont_iteration_next(pFont)))
-        g_mapScreens[SCREEN_PROGRAM]->Add(fluid_preset_get_name(pProgram), setPresetProgram, (fluid_preset_get_banknum(pProgram) << 8) + (fluid_preset_get_num(pProgram)));
+    {
+        nBank = fluid_preset_get_banknum(pProgram);
+        nProgram = fluid_preset_get_num(pProgram);
+        int nEntry = g_mapScreens[SCREEN_PROGRAM]->Add(fluid_preset_get_name(pProgram), setPresetProgram, (nBank << 8) + nProgram);
+        if(g_pCurrentPreset->program[g_nCurrentChannel].bank == nBank && g_pCurrentPreset->program[g_nCurrentChannel].program == nProgram)
+            g_mapScreens[SCREEN_PROGRAM]->SetSelection(nEntry);
+    }
     showScreen(SCREEN_PROGRAM);
 }
 

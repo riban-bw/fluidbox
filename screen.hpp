@@ -98,6 +98,10 @@ public:
         if(m_nSelection >= m_vEntries.size())
             m_nSelection = m_vEntries.size() - 1;
 
+        if(m_nSelection < m_nFirstEntry)
+            m_nFirstEntry = m_nSelection;
+        if(m_nSelection > m_nFirstEntry + 6)
+            m_nFirstEntry = m_nSelection - 6;
         int nY = (1 + m_nSelection - m_nFirstEntry) * 16;
         // Draw highlight
         if(m_nSelection > -1)
@@ -185,8 +189,6 @@ public:
                 break;
             }
         }
-        if(m_nSelection > m_nFirstEntry + 6)
-            m_nFirstEntry = m_nSelection - 6;
         Draw();
     };
 
@@ -203,8 +205,6 @@ public:
                 break;
             }
         }
-        if(m_nSelection < m_nFirstEntry)
-            m_nFirstEntry = m_nSelection;
         Draw();
     };
 

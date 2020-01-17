@@ -158,7 +158,6 @@ unsigned int g_nNoteCount[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // Quantity o
 std::vector<Preset*> g_vPresets; // Map of presets indexed by id
 Preset* g_pCurrentPreset = NULL; // Pointer to the currently selected preset
 unsigned int g_nSelectedChannel = 0; // Index of the selected (highlighted) program
-unsigned int g_nListSelection = 0; // Currently highlighted entry in a list
 unsigned char debouncePin[32]; // Debounce streams for each GPIO pin
 
 std::map<unsigned int,ListScreen*> g_mapScreens; // Map of screens indexed by id
@@ -209,10 +208,10 @@ int getPresetIndex(Preset* pPreset);
 **/
 void panic(int nMode=PANIC_NOTES, int nChannel=16);
 
-/*   Refresh the content of the presets list in the performance screen */
+/**  Refresh the content of the presets list in the performance screen */
 void refreshPresetList();
 
-/*   Set the dirty flag of a preset
+/**  Set the dirty flag of a preset
 *    @param pPreset Pointer to the preset - Default: current preset
 *    @param bDirty True to flag as dirty - Default: true
 */

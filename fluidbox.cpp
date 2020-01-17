@@ -30,6 +30,7 @@ void showScreen(int nScreen)
     switch(nScreen)
     {
     case SCREEN_PERFORMANCE:
+        refreshPresetList();
         pScreen->SetSelection(getPresetIndex(g_pCurrentPreset));
         if(g_bDirty)
             g_mapScreens[SCREEN_PERFORMANCE]->SetTitle("  *riban Fluidbox");
@@ -226,7 +227,6 @@ void setDirty(Preset* pPreset, bool bDirty)
     pPreset->dirty = bDirty;
     if(bDirty)
         g_bDirty = true;
-    refreshPresetList();
     if(g_nCurrentScreen == SCREEN_PERFORMANCE)
         showScreen(SCREEN_PERFORMANCE);
 }
@@ -301,20 +301,25 @@ void admin(unsigned int nAction)
      case SAVE_CONFIG:
         saveConfig();
         showScreen(SCREEN_PERFORMANCE);
+        g_mapScreens[SCREEN_EDIT]->SetSelection(0);
         return;
     case SAVE_BACKUP:
         if(isUsbMounted())
             saveConfig("/media/usb/fluidbox.config");
         showScreen(SCREEN_PERFORMANCE);
+        g_mapScreens[SCREEN_EDIT]->SetSelection(0);
         return;
     case LOAD_CONFIG:
         loadConfig();
+        selectPreset(g_pCurrentPreset);
         showScreen(SCREEN_PERFORMANCE);
+        g_mapScreens[SCREEN_EDIT]->SetSelection(0);
         return;
     case LOAD_BACKUP:
         if(isUsbMounted())
             loadConfig("/media/usb/fluidbox.config");
         showScreen(SCREEN_PERFORMANCE);
+        g_mapScreens[SCREEN_EDIT]->SetSelection(0);
         return;
     default:
         return;
@@ -978,6 +983,7 @@ bool loadConfig(string sFilename)
             g_pCurrentPreset = pPreset;
     }
     fileConfig.close();
+    g_bDirty = false;
     return true;
 }
 
@@ -1014,7 +1020,6 @@ Preset* createPreset()
     Preset* pPreset = new Preset;
     g_vPresets.push_back(pPreset);
     setDirty(pPreset);
-    refreshPresetList();
     return pPreset;
 }
 
@@ -1053,6 +1058,7 @@ void newPreset(unsigned int)
 {
     selectPreset(createPreset());
     showScreen(SCREEN_PERFORMANCE);
+    g_mapScreens[SCREEN_EDIT]->SetSelection(0);
 }
 
 void deletePreset()
@@ -1066,10 +1072,10 @@ void deletePreset()
         g_pCurrentPreset = g_vPresets[0];
     else
         g_pCurrentPreset = *it;
-    refreshPresetList();
     selectPreset(g_pCurrentPreset);
     g_bDirty = true;
     showScreen(SCREEN_PERFORMANCE);
+    g_mapScreens[SCREEN_EDIT]->SetSelection(0);
 }
 
 void requestDeletePreset(unsigned int)
@@ -1077,6 +1083,7 @@ void requestDeletePreset(unsigned int)
     if(g_vPresets.size() == 1)
     {
         showScreen(SCREEN_PERFORMANCE);
+        g_mapScreens[SCREEN_EDIT]->SetSelection(0);
         return; // Must have at least one preset
     }
 
@@ -1232,6 +1239,7 @@ void onButton(unsigned int nButton)
             g_mapScreens[g_nCurrentScreen]->Next();
             break;
         case BUTTON_RIGHT:
+            g_mapScreens[SCREEN_POWER]->SetParent(SCREEN_EDIT);
             g_mapScreens[g_nCurrentScreen]->Select();
             break;
         case BUTTON_LEFT:
@@ -1251,10 +1259,12 @@ void onLeftHold(unsigned int nGpio)
     switch(g_nCurrentScreen)
     {
     case SCREEN_PERFORMANCE:
+        g_mapScreens[SCREEN_POWER]->SetParent(SCREEN_PERFORMANCE);
         showScreen(SCREEN_POWER);
         break;
     default:
         showScreen(SCREEN_PERFORMANCE);
+        g_mapScreens[SCREEN_EDIT]->SetSelection(0);
     }
 }
 
@@ -1365,7 +1375,7 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_PERFORMANCE] = new ListScreen(g_pScreen, "   riban Fluidbox", SCREEN_NONE);
     g_mapScreens[SCREEN_EDIT_PRESET] = new ListScreen(g_pScreen, "Edit Preset", SCREEN_EDIT);
     g_mapScreens[SCREEN_EDIT] = new ListScreen(g_pScreen, "Edit", SCREEN_PERFORMANCE);
-    g_mapScreens[SCREEN_POWER] = new ListScreen(g_pScreen, "Power", SCREEN_PERFORMANCE);
+    g_mapScreens[SCREEN_POWER] = new ListScreen(g_pScreen, "Power", SCREEN_EDIT);
     g_mapScreens[SCREEN_PRESET_NAME] = new ListScreen(g_pScreen, "Preset Name", SCREEN_EDIT_PRESET);
     g_mapScreens[SCREEN_PRESET_SF] = new ListScreen(g_pScreen, "Preset Soundfont", SCREEN_EDIT_PRESET);
     g_mapScreens[SCREEN_PRESET_PROGRAM] = new ListScreen(g_pScreen,  "Preset Program", SCREEN_EDIT_PRESET);
@@ -1418,7 +1428,6 @@ int main(int argc, char** argv)
     // Select preset
     if(g_vPresets.size() == 0)
         g_pCurrentPreset = createPreset();
-    refreshPresetList();
     selectPreset(g_pCurrentPreset);
 
     // Show splash screen for a while (idle delay)

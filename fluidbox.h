@@ -70,7 +70,8 @@ enum ADMIN_MODE
     POWER_REBOOT_SAVE,
     SAVE_CONFIG,
     SAVE_BACKUP,
-    LOAD_BACKUP
+    LOAD_BACKUP,
+    LOAD_CONFIG
 };
 
 enum EFFECT_PARAM
@@ -218,7 +219,7 @@ void refreshPresetList();
 void setDirty(Preset* pPreset = NULL, bool bDirty = true);
 
 /** Save persistent data to configuration file */
-bool saveConfig(string sFilename = "./fb.config");
+bool saveConfig(string sFilename = "./fluidbox.config");
 
 /** Handle admin events
 *   @param  nAction ID of event
@@ -375,4 +376,10 @@ void setPresetProgram(int nBankProgram);
 *   @param nChannel Channel to edit
 */
 void selectProgram(int nChannel);
+
+/** Get the name of the MIDI program (patch) currently loaded to specified channel
+*   @param nChannel MIDI channel
+*   @retval string Name of program
+*/
+string getProgramName(unsigned int nChannel);
 

@@ -52,8 +52,8 @@ void showScreen(int nScreen)
     switch(nScreen)
     {
     case SCREEN_MIXER:
-        g_nCurrentChannel = 0;
-        for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
+        g_nCurrentChannel = 16;
+        for(unsigned int nChannel = 0; nChannel < 17; ++nChannel)
             drawMixerChannel(nChannel);
         break;
     case SCREEN_PRESET_NAME:
@@ -305,6 +305,10 @@ void admin(unsigned int nAction)
     case SAVE_BACKUP:
         if(isUsbMounted())
             saveConfig("/media/usb/fluidbox.config");
+        showScreen(SCREEN_PERFORMANCE);
+        return;
+    case LOAD_CONFIG:
+        loadConfig();
         showScreen(SCREEN_PERFORMANCE);
         return;
     case LOAD_BACKUP:
@@ -561,6 +565,22 @@ void selectProgram(int nChannel)
     showScreen(SCREEN_PROGRAM);
 }
 
+string getProgramName(unsigned int nChannel)
+{
+    if(nChannel > 15)
+        return "";
+    int nSfId, nBank, nProgram;
+    fluid_synth_get_program(g_pSynth, nChannel, &nSfId, &nBank, &nProgram);
+    fluid_sfont_t* pSoundfont = fluid_synth_get_sfont_by_id(g_pSynth, nSfId);
+    if(pSoundfont)
+    {
+        fluid_preset_t* pPreset = fluid_sfont_get_preset(pSoundfont, nBank, nProgram);
+        if(pPreset)
+            return fluid_preset_get_name(pPreset);
+    }
+    return "";
+}
+
 void showEditProgram(unsigned int)
 {
     g_mapScreens[SCREEN_PRESET_PROGRAM]->ClearList();
@@ -568,16 +588,9 @@ void showEditProgram(unsigned int)
     char sPrefix[6];
     for(unsigned int nChannel = 0; nChannel < 16; ++nChannel)
     {
-        fluid_synth_get_program(g_pSynth, nChannel, &nSfId, &nBank, &nProgram);
-        fluid_sfont_t* pSoundfont = fluid_synth_get_sfont_by_id(g_pSynth, nSfId);
         sprintf(sPrefix, "%02d: ", nChannel+1);
         string sName = (char*)sPrefix;
-        if(pSoundfont)
-        {
-            fluid_preset_t* pPreset = fluid_sfont_get_preset(pSoundfont, nBank, nProgram);
-            if(pPreset)
-                sName += fluid_preset_get_name(pPreset);
-        }
+        sName += getProgramName(nChannel);
         g_mapScreens[SCREEN_PRESET_PROGRAM]->Add(sName, selectProgram, nChannel);
     }
     showScreen(SCREEN_PRESET_PROGRAM);
@@ -591,32 +604,53 @@ void showMidiActivity(int nChannel)
         g_pScreen->DrawRect(0,nY, 1,nY+15, BLACK, 0, BLACK); // Clear the indicator
         int nCount = (g_nNoteCount[nChannel] < 16)?g_nNoteCount[nChannel]:15; // Limit max note indication to 15
         if(nCount)
-            g_pScreen->DrawRect(0,nY+15, 1,nY+15-nCount, RED, 0, RED); // Draw indicator
+            g_pScreen->DrawRect(0, nY + 15, 1, nY + 15-nCount, RED, 0, RED); // Draw indicator
     }
     else if(g_nCurrentScreen == SCREEN_MIXER)
     {
-        int nX = nChannel * 10; //Upper left corner of channel indicator
-        g_pScreen->DrawRect(nX, 126,nX+9, 127, BLACK, 0, BLACK); // Clear the indicator
+        int nX = 16 + nChannel * 9; //Upper left corner of channel indicator
+        g_pScreen->DrawRect(nX, 126, nX + 9, 127, BLACK, 0, BLACK); // Clear the indicator
         int nCount = (g_nNoteCount[nChannel] < 10)?g_nNoteCount[nChannel]:9; // Limit max note indication to 9
         if(nCount)
-            g_pScreen->DrawRect(nX, 126, nX+nCount, 127, RED, 0, RED); // Draw indicator
+            g_pScreen->DrawRect(nX, 126, nX + nCount, 127, RED, 0, RED); // Draw indicator
     }
 }
 
 void drawMixerChannel(unsigned int nChannel)
 {
     int nLevel;
-    if(g_nCurrentScreen != SCREEN_MIXER || nChannel > 15)
+    if(g_nCurrentScreen != SCREEN_MIXER || nChannel > 16)
         return;
-    if(FLUID_FAILED == fluid_synth_get_cc(g_pSynth, nChannel, 7, &nLevel))
-        return;
-    nLevel = (nLevel * 100) / 127;
-    g_pScreen->DrawRect(nChannel * 10, 19, nChannel * 10 + 9, 121, GREY, 1, BLACK); // Frame for fader
-    g_pScreen->DrawRect(nChannel * 10 + 1, 120, nChannel * 10 + 8, 120 - nLevel, DARK_GREEN, 0, DARK_GREEN); // Fader
+    unsigned int nX = 16 + nChannel * 9; // Left edge of channel on screen
+    unsigned int nXcurrent = 16 + g_nCurrentChannel * 9;
+    if(g_nCurrentChannel == 16)
+        nXcurrent = 0;
+    if(nChannel == 16)
+    {
+        // Master volume
+        nLevel = fluid_synth_get_gain(g_pSynth) * 400;
+        nX = 0;
+    }
+    else
+    {
+        if(FLUID_FAILED == fluid_synth_get_cc(g_pSynth, nChannel, 7, &nLevel))
+          return;
+        nLevel = (nLevel * 100) / 127;
+    }
+    if(nLevel > 100)
+        nLevel = 100;
+    g_pScreen->DrawRect(nX, 19, nX + 9, 121, GREY, 1, BLACK); // Frame for fader
+    g_pScreen->DrawRect(nX + 1, 120, nX + 7, 120 - nLevel, DARK_GREEN, 0, DARK_GREEN); // Fader
     g_pScreen->DrawRect(0,127, 159,122, BLACK, 0, BLACK); // Frame for selection highlight
-    g_pScreen->DrawRect(g_nCurrentChannel * 10, 124, g_nCurrentChannel * 10 + 10,122, BLUE, 0, BLUE); // Selection highlight
-    g_pScreen->SetFont(10);
-    g_pScreen->DrawText(to_string(nChannel + 1), nChannel * 10 + 9, 121, GREY, 90);
+    g_pScreen->DrawRect(nXcurrent, 124, nXcurrent + 9, 122, BLUE, 0, BLUE); // Selection highlight
+    g_pScreen->SetFont(9);
+    if(nChannel == 16)
+        g_pScreen->DrawText("Master volume", 8, 119, GREY, 90);
+    else
+    {
+        g_pScreen->DrawText(to_string(nChannel + 1), 16 + nChannel * 9 + 8, 121, GREY, 90);
+        g_pScreen->DrawText(getProgramName(nChannel).substr(0, 20), 16 + nChannel * 9 + 8, 110, GREY, 90);
+    }
     g_pScreen->SetFont(DEFAULT_FONT_SIZE);
 }
 
@@ -1074,41 +1108,62 @@ void onButton(unsigned int nButton)
         switch(nButton)
         {
         case BUTTON_LEFT:
-            if(g_nCurrentChannel)
-                drawMixerChannel(--g_nCurrentChannel);
-            else
+            if(g_nCurrentChannel == 16)
+            {
                 showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
+                break;
+            }
+            else if(g_nCurrentChannel == 0)
+                g_nCurrentChannel = 17;
+            drawMixerChannel(--g_nCurrentChannel);
             break;
         case BUTTON_RIGHT:
-            if(g_nCurrentChannel < 15)
-                drawMixerChannel(++g_nCurrentChannel);
-            else
+            if(++g_nCurrentChannel == 17)
+                g_nCurrentChannel = 0;
+            if(g_nCurrentChannel == 16)
                 g_nCurrentChannel = 15;
+            drawMixerChannel(g_nCurrentChannel);
             break;
         case BUTTON_UP:
             {
-                int nLevel;
-                if(FLUID_FAILED == fluid_synth_get_cc(g_pSynth, g_nCurrentChannel, 7, &nLevel))
-                    return;
-                if(nLevel >= 127)
-                    return;
-                fluid_synth_cc(g_pSynth, g_nCurrentChannel, 7, ++nLevel);
+                if(g_nCurrentChannel == 16)
+                {
+                    float fGain = fluid_synth_get_gain(g_pSynth);
+                    fluid_synth_set_gain(g_pSynth, fGain + ((fGain > 0.1)?0.01:0.001));
+                }
+                else
+                {
+                    int nLevel;
+                    if(FLUID_FAILED == fluid_synth_get_cc(g_pSynth, g_nCurrentChannel, 7, &nLevel))
+                        return;
+                    if(nLevel >= 127)
+                        return;
+                    fluid_synth_cc(g_pSynth, g_nCurrentChannel, 7, ++nLevel);
+                    g_pCurrentPreset->program[g_nCurrentChannel].level = nLevel;
+                    setDirty();
+                }
                 drawMixerChannel(g_nCurrentChannel);
-                g_pCurrentPreset->program[g_nCurrentChannel].level = nLevel;
-                setDirty();
                 break;
             }
         case BUTTON_DOWN:
             {
-                int nLevel;
-                if(FLUID_FAILED == fluid_synth_get_cc(g_pSynth, g_nCurrentChannel, 7, &nLevel))
-                    return;
-                if(nLevel < 1)
-                    return;
-                fluid_synth_cc(g_pSynth, g_nCurrentChannel, 7, --nLevel);
+                if(g_nCurrentChannel == 16)
+                {
+                    float fGain = fluid_synth_get_gain(g_pSynth);
+                    fluid_synth_set_gain(g_pSynth, fGain - ((fGain > 0.1)?0.01:0.001));
+                }
+                else
+                {
+                    int nLevel;
+                    if(FLUID_FAILED == fluid_synth_get_cc(g_pSynth, g_nCurrentChannel, 7, &nLevel))
+                        return;
+                    if(nLevel < 1)
+                        return;
+                    fluid_synth_cc(g_pSynth, g_nCurrentChannel, 7, --nLevel);
+                    g_pCurrentPreset->program[g_nCurrentChannel].level = nLevel;
+                    setDirty();
+                }
                 drawMixerChannel(g_nCurrentChannel);
-                g_pCurrentPreset->program[g_nCurrentChannel].level = nLevel;
-                setDirty();
                 break;
             }
         }
@@ -1331,6 +1386,7 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_EDIT]->Add("Save", admin, SAVE_CONFIG);
     g_mapScreens[SCREEN_EDIT]->Add("Backup", admin, SAVE_BACKUP);
     g_mapScreens[SCREEN_EDIT]->Add("Restore", admin, LOAD_BACKUP);
+    g_mapScreens[SCREEN_EDIT]->Add("Reload config", admin, LOAD_CONFIG);
     g_mapScreens[SCREEN_EDIT]->Add("Power", showScreen, SCREEN_POWER);
 
     g_mapScreens[SCREEN_EDIT_PRESET]->Add("Name", showScreen, SCREEN_PRESET_NAME);

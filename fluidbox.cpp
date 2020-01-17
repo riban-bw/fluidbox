@@ -785,6 +785,7 @@ void onSelectSoundfont(int nAction)
         g_pCurrentPreset->soundfont=sFilename;
         loadSoundfont(sFilename);
         setDirty(g_pCurrentPreset);
+        showScreen(SCREEN_EDIT_PRESET);
         break;
     }
 }
@@ -1390,10 +1391,10 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_EDIT]->Add("Mixer", showScreen, SCREEN_MIXER);
     g_mapScreens[SCREEN_EDIT]->Add("Effects", showScreen, SCREEN_EFFECTS);
     g_mapScreens[SCREEN_EDIT]->Add("Edit preset", showScreen, SCREEN_EDIT_PRESET);
+    g_mapScreens[SCREEN_EDIT]->Add("Save", admin, SAVE_CONFIG);
     g_mapScreens[SCREEN_EDIT]->Add("New preset", newPreset);
     g_mapScreens[SCREEN_EDIT]->Add("Delete preset", requestDeletePreset);
     g_mapScreens[SCREEN_EDIT]->Add("Manage soundfonts", showScreen, SCREEN_SOUNDFONT);
-    g_mapScreens[SCREEN_EDIT]->Add("Save", admin, SAVE_CONFIG);
     g_mapScreens[SCREEN_EDIT]->Add("Backup", admin, SAVE_BACKUP);
     g_mapScreens[SCREEN_EDIT]->Add("Restore", admin, LOAD_BACKUP);
     g_mapScreens[SCREEN_EDIT]->Add("Reload config", admin, LOAD_CONFIG);

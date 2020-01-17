@@ -559,10 +559,9 @@ void setPresetProgram(int nBankProgram)
     fluid_synth_bank_select(g_pSynth, g_nCurrentChannel, nBank);
     fluid_synth_program_change(g_pSynth, g_nCurrentChannel, nProgram);
     setDirty();
-    showEditProgram(0);
 }
 
-void selectProgram(int nChannel)
+void populateProgram(int nChannel)
 {
     g_mapScreens[SCREEN_PROGRAM]->ClearList();
     g_nCurrentChannel = nChannel;
@@ -608,7 +607,7 @@ void showEditProgram(unsigned int)
         sprintf(sPrefix, "%02d: ", nChannel+1);
         string sName = (char*)sPrefix;
         sName += getProgramName(nChannel);
-        g_mapScreens[SCREEN_PRESET_PROGRAM]->Add(sName, selectProgram, nChannel);
+        g_mapScreens[SCREEN_PRESET_PROGRAM]->Add(sName, populateProgram, nChannel);
     }
     showScreen(SCREEN_PRESET_PROGRAM);
 }
@@ -1254,6 +1253,22 @@ void onButton(unsigned int nButton)
         case BUTTON_LEFT:
         case BUTTON_RIGHT:
             showScreen(g_mapScreens[g_nCurrentScreen]->GetParent());
+            break;
+        }
+        break;
+    case SCREEN_PROGRAM:
+        switch(nButton)
+        {
+        case BUTTON_UP:
+            g_mapScreens[g_nCurrentScreen]->Previous();
+            g_mapScreens[g_nCurrentScreen]->Select();
+            break;
+        case BUTTON_DOWN:
+            g_mapScreens[g_nCurrentScreen]->Next();
+            g_mapScreens[g_nCurrentScreen]->Select();
+            break;
+        default:
+            showEditProgram(0);
             break;
         }
         break;

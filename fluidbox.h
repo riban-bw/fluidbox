@@ -371,10 +371,10 @@ void onSignal(int nSignal);
 */
 void setPresetProgram(int nBankProgram);
 
-/** Handle select program event
+/** Populates the program screen
 *   @param nChannel Channel to edit
 */
-void selectProgram(int nChannel);
+void populateProgram(int nChannel);
 
 /** Get the name of the MIDI program (patch) currently loaded to specified channel
 *   @param nChannel MIDI channel

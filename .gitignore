@@ -31,7 +31,7 @@
 *.out
 *.app
 
-fb.config
+fluidbox.config
 fluidbox
 fluidbox.debug
 fluidboxmanager

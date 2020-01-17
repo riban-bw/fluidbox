@@ -168,6 +168,14 @@ unsigned int g_nCurrentEffect;
 bool g_bDirty = false;// True if configuration needs to be saved
 SOUNDFONT_ACTION g_nSoundfontAction = SF_ACTION_NONE;
 std::function<void(void)> g_pAlertCallback = NULL;
+Style g_style;
+uint32_t g_colourMixerHighlight = ORANGE;
+uint32_t g_colourMixerFaderBg = DARK_GREEN;
+uint32_t g_colourMixerFaderFg =GREY;
+uint32_t g_colourAlertCanvas = ORANGE;
+uint32_t g_colourAlertYesBg = DARK_BLUE;
+uint32_t g_colourAlertNoBg = DARK_RED;
+uint32_t g_colourToastBg = DARK_BLUE;
 
 /**   Populate effect parameter data */
 void configParams();

@@ -245,6 +245,19 @@ bool saveConfig(string sFilename)
     // Save global configurations
     fileConfig << "[global]" << endl;
     fileConfig << "gain=" << fluid_synth_get_gain(g_pSynth) << endl;
+    fileConfig << "canvas=" << g_style.canvas << endl;
+    fileConfig << "style_title_background=" << g_style.title_background << endl;
+    fileConfig << "style_title_text=" << g_style.title_text << endl;
+    fileConfig << "style_select_background=" << g_style.select_background << endl;
+    fileConfig << "style_entry_text=" << g_style.entry_text << endl;
+    fileConfig << "style_disabled_text=" << g_style.disabled_text << endl;
+    fileConfig << "style_mixer_highlight=" << g_colourMixerHighlight << endl;
+    fileConfig << "style_mixer_fader_background=" << g_colourMixerFaderBg << endl;
+    fileConfig << "style_mixer_fader_text=" << g_colourMixerFaderFg << endl;
+    fileConfig << "style_alert_canvas=" << g_colourAlertCanvas << endl;
+    fileConfig << "style_alert_yes_background=" << g_colourAlertYesBg << endl;
+    fileConfig << "style_alert_no_background=" << g_colourAlertNoBg << endl;
+    fileConfig << "style_toast_background=" << g_colourToastBg << endl;
 
     // Save presets
     for(auto it = g_vPresets.begin(); it != g_vPresets.end(); ++it)
@@ -296,12 +309,12 @@ void admin(unsigned int nAction)
         break;
     case POWER_REBOOT:
         sCommand = "sudo reboot";
-        sMessage = "  REBOOTING";
+        sMessage = "  RESTARTING";
         break;
     case POWER_REBOOT_SAVE:
         saveConfig();
         sCommand = "sudo reboot";
-        sMessage = "  REBOOTING";
+        sMessage = "  RESTARTING";
         break;
      case SAVE_CONFIG:
         saveConfig();
@@ -340,7 +353,7 @@ void drawEffectValue(unsigned int nParam, double dValue)
 {
     if(g_nCurrentScreen != SCREEN_EDIT_VALUE || nParam > 10)
         return;
-    g_pScreen->DrawRect(0,16, 159,127, BLACK, 0, BLACK); // clear data area (keep title)
+    g_pScreen->DrawRect(0,16, 159,127, BLACK, 0, g_style.canvas); // clear data area (keep title)
     unsigned int nValue = (unsigned int)(dValue * (70 / g_mapEffectParams[nParam].max));
     if(nValue > 70)
         nValue = 70;
@@ -617,15 +630,15 @@ void showMidiActivity(int nChannel)
     if(g_nCurrentScreen == SCREEN_PRESET_PROGRAM && nChannel >= g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown() && nChannel <= g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown() + 6)
     {
         int nY = 16 + (nChannel - g_mapScreens[SCREEN_PRESET_PROGRAM]->GetFirstShown()) * 16; //Upper left corner of channel indicator
-        g_pScreen->DrawRect(0,nY, 1,nY+15, BLACK, 0, BLACK); // Clear the indicator
+        g_pScreen->DrawRect(0,nY, 1,nY+15, BLACK, 0, g_style.canvas); // Clear the indicator
         int nCount = (g_nNoteCount[nChannel] < 16)?g_nNoteCount[nChannel]:15; // Limit max note indication to 15
         if(nCount)
             g_pScreen->DrawRect(0, nY + 15, 1, nY + 15-nCount, RED, 0, RED); // Draw indicator
     }
     else if(g_nCurrentScreen == SCREEN_MIXER)
     {
-        int nX = 16 + nChannel * 9; //Upper left corner of channel indicator
-        g_pScreen->DrawRect(nX, 126, nX + 9, 127, BLACK, 0, BLACK); // Clear the indicator
+        int nX = 15 + nChannel * 9; //Upper left corner of channel indicator
+        g_pScreen->DrawRect(nX, 126, nX + 9, 127, BLACK, 0, g_style.canvas); // Clear the indicator
         int nCount = (g_nNoteCount[nChannel] < 10)?g_nNoteCount[nChannel]:9; // Limit max note indication to 9
         if(nCount)
             g_pScreen->DrawRect(nX, 126, nX + nCount, 127, RED, 0, RED); // Draw indicator
@@ -637,7 +650,7 @@ void drawMixerChannel(unsigned int nChannel)
     int nLevel;
     if(g_nCurrentScreen != SCREEN_MIXER || nChannel > 16)
         return;
-    unsigned int nX = 16 + nChannel * 9; // Left edge of channel on screen
+    unsigned int nX = 15 + nChannel * 9; // Left edge of channel on screen
     unsigned int nXcurrent = 16 + g_nCurrentChannel * 9;
     if(g_nCurrentChannel == 16)
         nXcurrent = 0;
@@ -655,26 +668,30 @@ void drawMixerChannel(unsigned int nChannel)
     }
     if(nLevel > 100)
         nLevel = 100;
-    g_pScreen->DrawRect(nX, 19, nX + 9, 121, GREY, 1, BLACK); // Frame for fader
+    g_pScreen->DrawRect(nX, 19, nX + 9, 121, GREY, 1, g_style.canvas); // Frame for fader
     g_pScreen->DrawRect(nX + 1, 120, nX + 7, 120 - nLevel, DARK_GREEN, 0, DARK_GREEN); // Fader
-    g_pScreen->DrawRect(0,127, 159,122, BLACK, 0, BLACK); // Frame for selection highlight
-    g_pScreen->DrawRect(nXcurrent, 124, nXcurrent + 9, 122, BLUE, 0, BLUE); // Selection highlight
+    g_pScreen->DrawRect(0,127, 159,122, g_style.canvas, 0, g_style.canvas); // Frame for selection highlight
+    g_pScreen->DrawRect(nXcurrent, 124, nXcurrent + 9, 122, g_colourMixerHighlight, 0, g_colourMixerHighlight);
     g_pScreen->SetFont(9);
     if(nChannel == 16)
+    {
         g_pScreen->DrawText("Master volume", 8, 119, GREY, 90);
+        g_pScreen->SetFont(DEFAULT_FONT_SIZE);
+        g_mapScreens[SCREEN_MIXER]->SetTitle("Master volume", true);
+    }
     else
     {
-        g_pScreen->DrawText(to_string(nChannel + 1), 16 + nChannel * 9 + 8, 121, GREY, 90);
-        g_pScreen->DrawText(getProgramName(nChannel).substr(0, 20), 16 + nChannel * 9 + 8, 110, GREY, 90);
+        g_pScreen->DrawText(to_string(nChannel + 1) + ":" + getProgramName(nChannel).substr(0, 17), 16 + nChannel * 9 + 8, 120, GREY, 90);
+        g_pScreen->SetFont(DEFAULT_FONT_SIZE);
+        g_mapScreens[SCREEN_MIXER]->SetTitle(to_string(nChannel + 1) + ":" + getProgramName(nChannel).substr(0, 20), true);
     }
-    g_pScreen->SetFont(DEFAULT_FONT_SIZE);
 }
 
 void drawPresetName()
 {
-    g_pScreen->DrawRect(0, 16, 159, 127, BLACK, 0, BLACK);
+    g_pScreen->DrawRect(0, 16, 159, 127, g_style.canvas, 0, g_style.canvas);
     g_pScreen->DrawText(g_pCurrentPreset->name, 8, 68);
-    g_pScreen->DrawRect(7 + g_nCurrentChar * 7, 71, 14 + g_nCurrentChar * 7, 72, BLACK, 0, BLUE);
+    g_pScreen->DrawRect(7 + g_nCurrentChar * 7, 71, 14 + g_nCurrentChar * 7, 72, BLACK, 0, g_colourMixerHighlight);
 }
 
 void listSoundfont(int nAction)
@@ -740,11 +757,10 @@ void alert(string sMessage, string sTitle, function<void(void)>  pFunction, unsi
     g_mapScreens[SCREEN_ALERT]->SetTitle(sTitle);
     g_mapScreens[SCREEN_ALERT]->SetParent(g_nCurrentScreen);
     showScreen(SCREEN_ALERT);
-    uint32_t nColour = ribanfblib::GetColour32(200, 150, 50);
-    g_pScreen->DrawRect(0,16,159,127, nColour, 0, nColour);
+    g_pScreen->DrawRect(0,16,159,127, g_colourAlertCanvas, 0, g_colourAlertCanvas);
     g_pScreen->DrawText(sMessage, 5, 55); //!@todo Allow multiline alert messages
-    g_pScreen->DrawCircle(25,100, 20, WHITE, 1, DARK_RED);
-    g_pScreen->DrawCircle(134,100, 20, WHITE, 1, DARK_BLUE);
+    g_pScreen->DrawCircle(25,100, 20, WHITE, 1, g_colourAlertNoBg);
+    g_pScreen->DrawCircle(134,100, 20, WHITE, 1, g_colourAlertYesBg);
     g_pScreen->SetFont(16);
     g_pScreen->DrawText("NO", 16, 107, WHITE);
     g_pScreen->DrawText("YES", 119, 107,  WHITE);
@@ -765,7 +781,7 @@ bool loadSoundfont(string sFilename)
     if(sFilename[0] == '~')
         sFilename = "default/" + sFilename.substr(1);
     sPath += sFilename;
-    g_pScreen->DrawRect(2,100, 157,124, DARK_BLUE, 5, DARK_BLUE, QUADRANT_ALL, 5);
+    g_pScreen->DrawRect(2,100, 157,124, g_colourToastBg, 5, g_colourToastBg, QUADRANT_ALL, 5);
     g_pScreen->DrawText("Loading soundfont", 4, 118, WHITE);
     g_nCurrentSoundfont = fluid_synth_sfload(g_pSynth, sPath.c_str(), 1);
     showScreen(g_nCurrentScreen);
@@ -944,6 +960,32 @@ bool loadConfig(string sFilename)
         {
             if(sParam == "gain")
                 fluid_synth_set_gain(g_pSynth, stof(sValue));
+            if(sParam == "style_canvas")
+                g_style.canvas = validateInt(sValue, 0, 0xFFFFFF);
+            if(sParam == "style_title_background")
+                g_style.title_background = validateInt(sValue, 0, 0xFFFFFF);
+            if(sParam == "style_title_text")
+                g_style.title_text = validateInt(sValue, 0, 0xFFFFFF);
+            if(sParam == "style_select_background")
+                g_style.select_background = validateInt(sValue, 0, 0xFFFFFF);
+            if(sParam == "style_entry_text")
+                g_style.entry_text = validateInt(sValue, 0, 0xFFFFFF);
+            if(sParam == "style_disabled_text")
+                g_style.disabled_text = validateInt(sValue, 0, 0xFFFFFF);
+            if(sParam == "style_mixer_highlight")
+                g_colourMixerHighlight = validateInt(sValue, 0, 0xFFFFFF);
+            if(sParam == "style_mixer_fader_background")
+                g_colourMixerFaderBg = validateInt(sValue, 0, 0xFFFFFF);
+            if(sParam == "style_mixer_fader_text")
+                g_colourMixerFaderFg = validateInt(sValue, 0, 0xFFFFFF);
+            if(sParam == "style_alert_canvas")
+                g_colourAlertCanvas = validateInt(sValue, 0, 0xFFFFFF);
+            if(sParam == "style_alert_yes_background")
+                g_colourAlertYesBg = validateInt(sValue, 0, 0xFFFFFF);
+            if(sParam == "style_alert_no_background")
+                g_colourAlertNoBg = validateInt(sValue, 0, 0xFFFFFF);
+            if(sParam == "style_toast_background")
+                g_colourToastBg = validateInt(sValue, 0, 0xFFFFFF);
         }
         else if(sGroup == "preset" && pPreset)
         {
@@ -1415,20 +1457,20 @@ int main(int argc, char** argv)
     signal(SIGTERM, onSignal);
     cout << "Configured signal handler" << endl;
 
-    g_mapScreens[SCREEN_PERFORMANCE] = new ListScreen(g_pScreen, "   riban Fluidbox", SCREEN_NONE);
-    g_mapScreens[SCREEN_EDIT_PRESET] = new ListScreen(g_pScreen, "Edit Preset", SCREEN_EDIT);
-    g_mapScreens[SCREEN_EDIT] = new ListScreen(g_pScreen, "Edit", SCREEN_PERFORMANCE);
-    g_mapScreens[SCREEN_POWER] = new ListScreen(g_pScreen, "Power", SCREEN_EDIT);
-    g_mapScreens[SCREEN_PRESET_NAME] = new ListScreen(g_pScreen, "Preset Name", SCREEN_EDIT_PRESET);
-    g_mapScreens[SCREEN_PRESET_SF] = new ListScreen(g_pScreen, "Preset Soundfont", SCREEN_EDIT_PRESET);
-    g_mapScreens[SCREEN_PRESET_PROGRAM] = new ListScreen(g_pScreen,  "Preset Program", SCREEN_EDIT_PRESET);
-    g_mapScreens[SCREEN_PROGRAM] = new ListScreen(g_pScreen,  "Program", SCREEN_PRESET_PROGRAM);
-    g_mapScreens[SCREEN_EFFECTS] = new ListScreen(g_pScreen, "Effects", SCREEN_EDIT);
-    g_mapScreens[SCREEN_MIXER] = new ListScreen(g_pScreen,  "Mixer", SCREEN_EDIT);
-    g_mapScreens[SCREEN_SOUNDFONT] = new ListScreen(g_pScreen, "Manage soundfonts", SCREEN_EDIT);
-    g_mapScreens[SCREEN_SOUNDFONT_LIST] = new ListScreen(g_pScreen, "Available soundfonts", SCREEN_SOUNDFONT);
-    g_mapScreens[SCREEN_EDIT_VALUE] = new ListScreen(g_pScreen, "Effect parameter", SCREEN_EFFECTS);
-    g_mapScreens[SCREEN_ALERT] = new ListScreen(g_pScreen, "     ALERT", SCREEN_PERFORMANCE);
+    g_mapScreens[SCREEN_PERFORMANCE] = new ListScreen(g_pScreen, "   riban Fluidbox", SCREEN_NONE, &g_style);
+    g_mapScreens[SCREEN_EDIT_PRESET] = new ListScreen(g_pScreen, "Edit Preset", SCREEN_EDIT, &g_style);
+    g_mapScreens[SCREEN_EDIT] = new ListScreen(g_pScreen, "Edit", SCREEN_PERFORMANCE, &g_style);
+    g_mapScreens[SCREEN_POWER] = new ListScreen(g_pScreen, "Power", SCREEN_EDIT, &g_style);
+    g_mapScreens[SCREEN_PRESET_NAME] = new ListScreen(g_pScreen, "Preset Name", SCREEN_EDIT_PRESET, &g_style);
+    g_mapScreens[SCREEN_PRESET_SF] = new ListScreen(g_pScreen, "Preset Soundfont", SCREEN_EDIT_PRESET, &g_style);
+    g_mapScreens[SCREEN_PRESET_PROGRAM] = new ListScreen(g_pScreen,  "Preset Program", SCREEN_EDIT_PRESET, &g_style);
+    g_mapScreens[SCREEN_PROGRAM] = new ListScreen(g_pScreen,  "Program", SCREEN_PRESET_PROGRAM, &g_style);
+    g_mapScreens[SCREEN_EFFECTS] = new ListScreen(g_pScreen, "Effects", SCREEN_EDIT, &g_style);
+    g_mapScreens[SCREEN_MIXER] = new ListScreen(g_pScreen,  "", SCREEN_EDIT, &g_style);
+    g_mapScreens[SCREEN_SOUNDFONT] = new ListScreen(g_pScreen, "Manage soundfonts", SCREEN_EDIT, &g_style);
+    g_mapScreens[SCREEN_SOUNDFONT_LIST] = new ListScreen(g_pScreen, "Available soundfonts", SCREEN_SOUNDFONT, &g_style);
+    g_mapScreens[SCREEN_EDIT_VALUE] = new ListScreen(g_pScreen, "Effect parameter", SCREEN_EFFECTS, &g_style);
+    g_mapScreens[SCREEN_ALERT] = new ListScreen(g_pScreen, "     ALERT", SCREEN_PERFORMANCE, &g_style);
 
     g_mapScreens[SCREEN_EDIT]->Add("Mixer", showScreen, SCREEN_MIXER);
     g_mapScreens[SCREEN_EDIT]->Add("Effects", showScreen, SCREEN_EFFECTS);
@@ -1447,9 +1489,9 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_EDIT_PRESET]->Add("Program", showEditProgram);
 
     g_mapScreens[SCREEN_POWER]->Add("Save and power off", admin, POWER_OFF_SAVE);
-    g_mapScreens[SCREEN_POWER]->Add("Save and reboot", admin, POWER_REBOOT_SAVE);
+    g_mapScreens[SCREEN_POWER]->Add("Save and restart", admin, POWER_REBOOT_SAVE);
     g_mapScreens[SCREEN_POWER]->Add("Power off", admin, POWER_OFF);
-    g_mapScreens[SCREEN_POWER]->Add("Reboot",  admin, POWER_REBOOT);
+    g_mapScreens[SCREEN_POWER]->Add("Restart",  admin, POWER_REBOOT);
 
     g_mapScreens[SCREEN_EFFECTS]->Add("Reverb enable", editEffect, REVERB_ENABLE);
     g_mapScreens[SCREEN_EFFECTS]->Add("Reverb room size", editEffect, REVERB_ROOMSIZE);
@@ -1490,7 +1532,7 @@ int main(int argc, char** argv)
     delete_fluid_midi_driver(pMidiDriver);
     delete_fluid_synth(g_pSynth);
     delete_fluid_settings(pSettings);
-    g_pScreen->Clear();
+//    g_pScreen->Clear();
     for(auto it = g_mapScreens.begin(); it!= g_mapScreens.end(); ++it)
         delete it->second;
     g_mapScreens.clear();

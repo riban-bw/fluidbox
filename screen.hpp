@@ -3,13 +3,6 @@
 
 #include "ribanfblib/ribanfblib.h"
 
-#define TITLE_BG PURPLE
-#define TITLE_FG WHITE
-#define SELECT_BG DARK_BLUE
-#define ENTRY_FG WHITE
-#define DISABLED_FG GREY
-
-
 using namespace std;
 
 
@@ -22,6 +15,16 @@ struct ListEntry
     bool enabled = true;
 };
 
+struct Style
+{
+    uint32_t canvas = BLACK;
+    uint32_t title_background = 0x410447;
+    uint32_t title_text = WHITE;
+    uint32_t select_background = DARK_BLUE;
+    uint32_t entry_text = WHITE;
+    uint32_t disabled_text = GREY;
+};
+
 
 class ListScreen
 {
@@ -31,10 +34,11 @@ public:
     *	@param	sTitle	Title to display at top of screen
     *	@param	nParent Index of parent screen
     */
-    ListScreen(ribanfblib* pScreen, string sTitle, unsigned int nParent) :
+    ListScreen(ribanfblib* pScreen, string sTitle, unsigned int nParent, Style* pStyle) :
         m_pScreen(pScreen),
         m_sTitle(sTitle),
-        m_nParent(nParent)
+        m_nParent(nParent),
+        m_pStyle(pStyle)
     {
     }
 
@@ -90,9 +94,9 @@ public:
     /**	Display the screen */
     virtual void Draw()
     {
-        m_pScreen->Clear();
-        m_pScreen->DrawRect(0,0, 160,16, TITLE_BG, 0, TITLE_BG);
-        m_pScreen->DrawText(m_sTitle, 5, 13, TITLE_FG);
+        m_pScreen->Clear(m_pStyle->canvas);
+        m_pScreen->DrawRect(0,0, 160,16, m_pStyle->title_background, 0, m_pStyle->title_background);
+        m_pScreen->DrawText(m_sTitle, 5, 13, m_pStyle->title_text);
         if(!m_vEntries.size())
             return;
         if(m_nSelection >= m_vEntries.size())
@@ -106,7 +110,7 @@ public:
         // Draw highlight
         if(m_nSelection > -1)
         {
-            m_pScreen->DrawRect(2,nY, 160,nY+15, SELECT_BG, 0, SELECT_BG);
+            m_pScreen->DrawRect(2,nY, 160,nY+15, m_pStyle->select_background, 0, m_pStyle->select_background);
         }
         // Draw entries
         for(unsigned int nRow = 0; nRow < 7; ++nRow)
@@ -114,9 +118,9 @@ public:
             if(nRow + m_nFirstEntry > m_vEntries.size() - 1)
                 return; // Reached end of list
             if(m_vEntries[nRow + m_nFirstEntry]->enabled)
-                m_pScreen->DrawText(m_vEntries[nRow + m_nFirstEntry]->title, 2, 16*(nRow+2) - 2, ENTRY_FG);
+                m_pScreen->DrawText(m_vEntries[nRow + m_nFirstEntry]->title, 2, 16*(nRow+2) - 2, m_pStyle->entry_text);
             else
-                m_pScreen->DrawText(m_vEntries[nRow + m_nFirstEntry]->title, 2, 16*(nRow+2) - 2, DISABLED_FG);
+                m_pScreen->DrawText(m_vEntries[nRow + m_nFirstEntry]->title, 2, 16*(nRow+2) - 2, m_pStyle->disabled_text);
         }
     }
 
@@ -265,16 +269,23 @@ public:
 
     /** Set the title shown at the top of the screen
     *   @param sTitle Text of title
+    *   @param bRefresh Redraw title
     */
-    void SetTitle(string sTitle)
+    void SetTitle(string sTitle, bool bRefresh = false)
     {
         m_sTitle = sTitle;
+        if(bRefresh)
+        {
+            m_pScreen->DrawRect(0,0, 160,16, m_pStyle->title_background, 0, m_pStyle->title_background);
+            m_pScreen->DrawText(m_sTitle, 5, 13, m_pStyle->title_text);
+        }
     }
 
 
 protected:
     ribanfblib* m_pScreen;
     string m_sTitle;
+    Style* m_pStyle;
 
     unsigned int m_nPreviousScreen = 0;
     unsigned int m_nParent = 0;

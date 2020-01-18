@@ -245,7 +245,8 @@ bool saveConfig(string sFilename)
     // Save global configurations
     fileConfig << "[global]" << endl;
     fileConfig << "gain=" << fluid_synth_get_gain(g_pSynth) << endl;
-    fileConfig << "canvas=" << g_style.canvas << endl;
+    fileConfig << "style_font=" << g_sFont << endl;
+    fileConfig << "style_canvas=0x" << hex << g_style.canvas << endl;
     fileConfig << "style_title_background=0x" << hex << g_style.title_background << endl;
     fileConfig << "style_title_text=0x" << hex << g_style.title_text << endl;
     fileConfig << "style_select_background=0x" << hex << g_style.select_background << endl;
@@ -681,13 +682,15 @@ void drawMixerChannel(unsigned int nChannel)
     {
         g_pScreen->DrawText("Master volume", 8, 119, GREY, 90);
         g_pScreen->SetFont(DEFAULT_FONT_SIZE);
-        g_mapScreens[SCREEN_MIXER]->SetTitle("Master volume", true);
+        if(nChannel == g_nCurrentChannel)
+            g_mapScreens[SCREEN_MIXER]->SetTitle("Master volume", true);
     }
     else
     {
         g_pScreen->DrawText(to_string(nChannel + 1) + ":" + getProgramName(nChannel).substr(0, 17), 16 + nChannel * 9 + 8, 120, GREY, 90);
         g_pScreen->SetFont(DEFAULT_FONT_SIZE);
-        g_mapScreens[SCREEN_MIXER]->SetTitle(to_string(nChannel + 1) + ":" + getProgramName(nChannel).substr(0, 20), true);
+        if(nChannel == g_nCurrentChannel)
+            g_mapScreens[SCREEN_MIXER]->SetTitle(to_string(nChannel + 1) + ":" + getProgramName(nChannel).substr(0, 20), true);
     }
 }
 
@@ -964,7 +967,13 @@ bool loadConfig(string sFilename)
         {
             if(sParam == "gain")
                 fluid_synth_set_gain(g_pSynth, stof(sValue));
-            if(sParam == "style_canvas")
+            if(sParam == "style_font")
+            {
+                g_sFont = sValue;
+                if(g_pScreen)
+                    g_pScreen->SetFont(DEFAULT_FONT_SIZE, g_sFont);
+            }
+            if(sParam == "style_title_background")
                 g_style.canvas = validateInt(sValue, 0, 0xFFFFFF);
             if(sParam == "style_title_background")
                 g_style.title_background = validateInt(sValue, 0, 0xFFFFFF);
@@ -1399,7 +1408,7 @@ int main(int argc, char** argv)
     g_pScreen = new ribanfblib("/dev/fb1");
     g_pScreen->LoadBitmap("logo.bmp", "logo");
     showScreen(SCREEN_LOGO);
-    g_pScreen->SetFont(DEFAULT_FONT_SIZE, "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf");
+    //g_pScreen->SetFont(DEFAULT_FONT_SIZE, "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf");
     configParams();
 
     system("gpio mode 26 pwm");
@@ -1443,6 +1452,7 @@ int main(int argc, char** argv)
         cerr << "Failed to create audio driver" << endl;
 
     loadConfig();
+    g_pScreen->SetFont(DEFAULT_FONT_SIZE, "/usr/share/fonts/truetype/" + g_sFont);
 
     // Configure buttons
     wiringPiSetupGpio();

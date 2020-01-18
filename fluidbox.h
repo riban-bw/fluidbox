@@ -170,6 +170,7 @@ bool g_bDirty = false;// True if configuration needs to be saved
 SOUNDFONT_ACTION g_nSoundfontAction = SF_ACTION_NONE;
 std::function<void(void)> g_pAlertCallback = NULL;
 Style g_style;
+string g_sFont = "liberation/LiberationMono-Regular.ttf";
 uint32_t g_colourMixerHighlight = ORANGE;
 uint32_t g_colourMixerFaderBg = DARK_GREEN;
 uint32_t g_colourMixerFaderFg =GREY;

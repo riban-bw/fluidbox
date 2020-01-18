@@ -120,7 +120,7 @@ double validateDouble(string sValue, double min, double max)
     double fValue = 0.0;
     try
     {
-        fValue = stod(sValue);
+        fValue = stod(sValue, 0);
     }
     catch(...)
     {
@@ -138,7 +138,7 @@ int validateInt(string sValue, int min, int max)
     int nValue = 0;
     try
     {
-        nValue = stoi(sValue);
+        nValue = stoi(sValue, 0, 0);
     }
     catch(...)
     {
@@ -246,18 +246,18 @@ bool saveConfig(string sFilename)
     fileConfig << "[global]" << endl;
     fileConfig << "gain=" << fluid_synth_get_gain(g_pSynth) << endl;
     fileConfig << "canvas=" << g_style.canvas << endl;
-    fileConfig << "style_title_background=" << g_style.title_background << endl;
-    fileConfig << "style_title_text=" << g_style.title_text << endl;
-    fileConfig << "style_select_background=" << g_style.select_background << endl;
-    fileConfig << "style_entry_text=" << g_style.entry_text << endl;
-    fileConfig << "style_disabled_text=" << g_style.disabled_text << endl;
-    fileConfig << "style_mixer_highlight=" << g_colourMixerHighlight << endl;
-    fileConfig << "style_mixer_fader_background=" << g_colourMixerFaderBg << endl;
-    fileConfig << "style_mixer_fader_text=" << g_colourMixerFaderFg << endl;
-    fileConfig << "style_alert_canvas=" << g_colourAlertCanvas << endl;
-    fileConfig << "style_alert_yes_background=" << g_colourAlertYesBg << endl;
-    fileConfig << "style_alert_no_background=" << g_colourAlertNoBg << endl;
-    fileConfig << "style_toast_background=" << g_colourToastBg << endl;
+    fileConfig << "style_title_background=0x" << hex << g_style.title_background << endl;
+    fileConfig << "style_title_text=0x" << hex << g_style.title_text << endl;
+    fileConfig << "style_select_background=0x" << hex << g_style.select_background << endl;
+    fileConfig << "style_entry_text=0x" << hex << g_style.entry_text << endl;
+    fileConfig << "style_disabled_text=0x" << hex << g_style.disabled_text << endl;
+    fileConfig << "style_mixer_highlight=0x" << hex << g_colourMixerHighlight << endl;
+    fileConfig << "style_mixer_fader_background=0x" << hex << g_colourMixerFaderBg << endl;
+    fileConfig << "style_mixer_fader_text=0x" << hex << g_colourMixerFaderFg << endl;
+    fileConfig << "style_alert_canvas=0x" << hex << g_colourAlertCanvas << endl;
+    fileConfig << "style_alert_yes_background=0x" << hex << g_colourAlertYesBg << endl;
+    fileConfig << "style_alert_no_background=0x" << hex << g_colourAlertNoBg << endl;
+    fileConfig << "style_toast_background=0x" << hex << g_colourToastBg << endl;
 
     // Save presets
     for(auto it = g_vPresets.begin(); it != g_vPresets.end(); ++it)
@@ -314,6 +314,10 @@ void admin(unsigned int nAction)
     case POWER_REBOOT_SAVE:
         saveConfig();
         sCommand = "sudo reboot";
+        sMessage = "  RESTARTING";
+        break;
+    case RESTART_SERVICE:
+        sCommand = "sudo service fluidbox restart";
         sMessage = "  RESTARTING";
         break;
      case SAVE_CONFIG:
@@ -1492,6 +1496,7 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_POWER]->Add("Save and restart", admin, POWER_REBOOT_SAVE);
     g_mapScreens[SCREEN_POWER]->Add("Power off", admin, POWER_OFF);
     g_mapScreens[SCREEN_POWER]->Add("Restart",  admin, POWER_REBOOT);
+    g_mapScreens[SCREEN_POWER]->Add("Restart app only",  admin, RESTART_SERVICE);
 
     g_mapScreens[SCREEN_EFFECTS]->Add("Reverb enable", editEffect, REVERB_ENABLE);
     g_mapScreens[SCREEN_EFFECTS]->Add("Reverb room size", editEffect, REVERB_ROOMSIZE);

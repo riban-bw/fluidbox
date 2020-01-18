@@ -28,6 +28,7 @@ bool g_bRun = true; // True whilst in program loop
 unsigned int g_nCountdown = 159; // Used to draw countdown progress bar (width of screen)
 ListScreen* g_pDisplay; // Pointer to the list screen
 ribanfblib* g_pScreen; // Pointer to the frame buffer object
+Style g_style;
 
 /** @brief  Handles signal
 *   @param  nSignal Signal number
@@ -153,7 +154,7 @@ int main(int argc, char** argv)
     bool bBackup = (stat ("/media/usb0/fluidbox.config", &fileStat) == 0 && S_ISREG(fileStat.st_mode));
     if(bFluidbox || bBackup)
     {
-        ListScreen display(&screen, "Update available", 0);
+        ListScreen display(&screen, "Update available", 0, &g_style);
         g_pDisplay = &display;
         display.Add("Update fluidbox", update, UPDATE_FLUIDBOX);
         if(!bFluidbox)

@@ -114,9 +114,9 @@ void configParams()
     g_mapParams[CHORUS_TYPE].max = FLUID_CHORUS_MOD_TRIANGLE;
     g_mapParams[CHORUS_TYPE].delta = 1.0;
 	g_mapParams[BACKLIGHT_BRIGHTNESS].name = "Screen brightness";
-	g_mapParams[BACKLIGHT_BRIGHTNESS].min = 20;
-	g_mapParams[BACKLIGHT_BRIGHTNESS].max = 1020;
-	g_mapParams[BACKLIGHT_BRIGHTNESS].delta = 20;
+	g_mapParams[BACKLIGHT_BRIGHTNESS].min = 5;
+	g_mapParams[BACKLIGHT_BRIGHTNESS].max = 100;
+	g_mapParams[BACKLIGHT_BRIGHTNESS].delta = 5;
 }
 
 double validateDouble(string sValue, double min, double max)
@@ -939,10 +939,10 @@ int onMidiEvent(void* pData, fluid_midi_event_t* pEvent)
 
 void setBacklight(unsigned int nLevel)
 {
-	if(nLevel > 1023)
-		nLevel = 1023;
+	if(nLevel > 100)
+		nLevel = 100;
 	g_nBacklight = nLevel;
-	string sCommand = "gpio pwm " + to_string(DISPLAY_LED) + " " + to_string(g_nBacklight);
+	string sCommand = "gpio pwm " + to_string(DISPLAY_LED) + " " + to_string(g_nBacklight * 10);
 		system(sCommand.c_str());	
 }
 

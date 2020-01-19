@@ -28,7 +28,7 @@
 #define SPI_SCLK      11
 #define DISPLAY_DC    24
 #define DISPLAY_RESET 25
-#define DISPLAY_LED   12
+#define DISPLAY_LED   26
 
 using namespace std;
 
@@ -39,6 +39,7 @@ enum SCREEN_ID
     SCREEN_BLANK,
     SCREEN_LOGO,
     SCREEN_EDIT,
+	SCREEN_CONFIG,
     SCREEN_POWER,
     SCREEN_EDIT_PRESET,
     SCREEN_PRESET_NAME,
@@ -75,7 +76,7 @@ enum ADMIN_MODE
     LOAD_CONFIG
 };
 
-enum EFFECT_PARAM
+enum PARAMETER
 {
     REVERB_ENABLE,
     REVERB_ROOMSIZE,
@@ -87,7 +88,9 @@ enum EFFECT_PARAM
     CHORUS_LEVEL,
     CHORUS_SPEED,
     CHORUS_DEPTH,
-    CHORUS_TYPE
+    CHORUS_TYPE,
+	BACKLIGHT_BRIGHTNESS,
+	PARAM_EOL
 };
 
 enum SOUNDFONT_ACTION
@@ -140,8 +143,8 @@ struct Preset
     bool dirty = false;
 };
 
-/** Limits of each effect parameter */
-struct EffectParams
+/** Limits of each adjustable parameter */
+struct AdjustableParam
 {
     double min;
     double max;
@@ -150,7 +153,7 @@ struct EffectParams
 };
 
 
-std::map <unsigned int,EffectParams> g_mapEffectParams;
+std::map <unsigned int,AdjustableParam> g_mapParams;
 fluid_synth_t* g_pSynth; // Pointer to the synth object
 ribanfblib* g_pScreen; // Pointer to the screen object
 int g_nCurrentSoundfont = FLUID_FAILED; // ID of currently loaded soundfont
@@ -165,7 +168,8 @@ std::map<unsigned int,ListScreen*> g_mapScreens; // Map of screens indexed by id
 unsigned int g_nCurrentScreen; // Id of currently displayed screen
 unsigned int g_nCurrentChannel = 0; // Selected channel, e.g. within mixer screen
 unsigned int g_nCurrentChar = 0; // Index of highlighted character in name edit
-unsigned int g_nCurrentEffect;
+unsigned int g_nCurrentParam; // Index of parameter currently being edited
+unsigned int g_nBacklight = 900; // Value of backlight PWM level (0..1023)
 bool g_bDirty = false;// True if configuration needs to be saved
 SOUNDFONT_ACTION g_nSoundfontAction = SF_ACTION_NONE;
 std::function<void(void)> g_pAlertCallback = NULL;
@@ -235,19 +239,19 @@ bool saveConfig(string sFilename = "./fluidbox.config");
 */
 void admin(unsigned int nAction);
 
-/** Draws representation of current effect parameter value
-*   @param  nParam Index of the effect parameter
+/** Draws representation of current parameter value
+*   @param  nParam Index of the parameter
 *   @param  nValue Value of parameter, scaled to 0..70
 */
-void drawEffectValue(unsigned int nParam, double dValue);
+void drawParamValue(unsigned int nParam, double dValue);
 
-/** Alters the value of an effect parameter
-*   @param  nParam Index of the effect parameter to alter
+/** Alters the value of a parameter
+*   @param  nParam Index of the parameter to alter
 *   @param  nChange Amount to change value [-1, 0, +1]
 *   @retval double Value of the parameter after adjustment
 *   @note   If nChange is non-zero then screen is drawn with new value
 */
-double adjustEffect(unsigned int nParam, int nChange = 0);
+double adjustParam(unsigned int nParam, int nChange = 0);
 
 /**  Set enable or disable an effect
 *    @param nEffect Index of the effect [REVERB_ENABLE | CHORUS_ENABLE]
@@ -255,7 +259,10 @@ double adjustEffect(unsigned int nParam, int nChange = 0);
 */
 void enableEffect(unsigned int nEffect, bool bEnable = true);
 
-void editEffect(unsigned int nParam);
+/**	Handle request to edit a parameter
+*	@param	nParam Id of parameter to adjusts
+*/
+void editParam(unsigned int nParam);
 
 /**  Shows the edit program screen */
 void showEditProgram(unsigned int=0);
@@ -340,12 +347,17 @@ bool selectPreset(Preset* pPreset);
 */
 Preset* createPreset();
 
+/**	Handle copy preset event
+*	@param int not used
+*/
+void copyPreset(int);
+
 /**  Copy a preset
 *    @param pSrc Pointer to the source preset
 *    @param pDst Pointer to the destination preset (NULL to create new preset)
-*    @retval bool True on success
+*    @retval Preset* Pointer to the new preset or NULL on fail
 */
-bool copyPreset(Preset* pSrc, Preset* pDst = NULL);
+Preset* doCopyPreset(Preset* pSrc, Preset* pDst = NULL);
 
 /** Handle newPreset event */
 void newPreset(unsigned int);
@@ -392,3 +404,7 @@ void populateProgram(int nChannel);
 */
 string getProgramName(unsigned int nChannel);
 
+/**	Adjust the LCD screen backlight brightness
+*	@param nLevel Brightness [0..1023]
+*/
+void setBacklight(unsigned int nLevel);

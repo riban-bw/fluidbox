@@ -692,21 +692,21 @@ void drawMixerChannel(unsigned int nChannel)
     }
     if(nLevel > 100)
         nLevel = 100;
-    g_pScreen->DrawRect(nX, 19, nX + 9, 121, GREY, 1, g_style.canvas); // Frame for fader
-    g_pScreen->DrawRect(nX + 1, 120, nX + 7, 120 - nLevel, DARK_GREEN, 0, DARK_GREEN); // Fader
+    g_pScreen->DrawRect(nX, 19, nX + 9, 121, g_style.canvas, 1, g_style.canvas); // Frame for fader
+    g_pScreen->DrawRect(nX + 1, 120, nX + 7, 120 - nLevel, g_colourMixerFaderBg, 0, g_colourMixerFaderBg); // Fader
     g_pScreen->DrawRect(0,127, 159,122, g_style.canvas, 0, g_style.canvas); // Frame for selection highlight
     g_pScreen->DrawRect(nXcurrent, 124, nXcurrent + 9, 122, g_colourMixerHighlight, 0, g_colourMixerHighlight);
     g_pScreen->SetFont(9);
     if(nChannel == 16)
     {
-        g_pScreen->DrawText("Master volume", 8, 119, GREY, 90);
+        g_pScreen->DrawText("Master volume", 8, 119, g_colourMixerFaderFg, 90);
         g_pScreen->SetFont(DEFAULT_FONT_SIZE);
         if(nChannel == g_nCurrentChannel)
             g_mapScreens[SCREEN_MIXER]->SetTitle("Master volume", true);
     }
     else
     {
-        g_pScreen->DrawText(to_string(nChannel + 1) + ":" + getProgramName(nChannel).substr(0, 17), 16 + nChannel * 9 + 8, 120, GREY, 90);
+        g_pScreen->DrawText(to_string(nChannel + 1) + ":" + getProgramName(nChannel).substr(0, 17), 16 + nChannel * 9 + 8, 120, g_colourMixerFaderFg, 90);
         g_pScreen->SetFont(DEFAULT_FONT_SIZE);
         if(nChannel == g_nCurrentChannel)
             g_mapScreens[SCREEN_MIXER]->SetTitle(to_string(nChannel + 1) + ":" + getProgramName(nChannel).substr(0, 20), true);
@@ -717,7 +717,7 @@ void drawPresetName()
 {
     g_pScreen->DrawRect(0, 16, 159, 127, g_style.canvas, 0, g_style.canvas);
     g_pScreen->DrawText(g_pCurrentPreset->name, 8, 68);
-    g_pScreen->DrawRect(7 + g_nCurrentChar * 7, 71, 14 + g_nCurrentChar * 7, 72, BLACK, 0, g_colourMixerHighlight);
+    g_pScreen->DrawRect(7 + g_nCurrentChar * 7, 71, 14 + g_nCurrentChar * 7, 72, g_colourMixerHighlight, 0, g_colourMixerHighlight);
 }
 
 void listSoundfont(int nAction)

@@ -943,7 +943,7 @@ void setBacklight(unsigned int nLevel)
 		nLevel = 100;
 	g_nBacklight = nLevel;
 	string sCommand = "gpio pwm " + to_string(DISPLAY_LED) + " " + to_string(g_nBacklight * 10);
-		system(sCommand.c_str());	
+		system(sCommand.c_str());
 }
 
 bool loadConfig(string sFilename)
@@ -1522,7 +1522,7 @@ int main(int argc, char** argv)
     g_mapScreens[SCREEN_PROGRAM] = new ListScreen(g_pScreen,  "Program", SCREEN_PRESET_PROGRAM, &g_style);
     g_mapScreens[SCREEN_EFFECTS] = new ListScreen(g_pScreen, "Effects", SCREEN_EDIT, &g_style);
     g_mapScreens[SCREEN_MIXER] = new ListScreen(g_pScreen,  "", SCREEN_EDIT, &g_style);
-    g_mapScreens[SCREEN_SOUNDFONT] = new ListScreen(g_pScreen, "Manage soundfonts", SCREEN_EDIT, &g_style);
+    g_mapScreens[SCREEN_SOUNDFONT] = new ListScreen(g_pScreen, "Manage soundfonts", SCREEN_CONFIG, &g_style);
     g_mapScreens[SCREEN_SOUNDFONT_LIST] = new ListScreen(g_pScreen, "Available soundfonts", SCREEN_SOUNDFONT, &g_style);
     g_mapScreens[SCREEN_EDIT_VALUE] = new ListScreen(g_pScreen, "Effect parameter", SCREEN_EFFECTS, &g_style);
     g_mapScreens[SCREEN_ALERT] = new ListScreen(g_pScreen, "     ALERT", SCREEN_PERFORMANCE, &g_style);
